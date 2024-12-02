@@ -8,6 +8,7 @@ use std::{
 
 use super::conv;
 use crate::auxil::map_naga_stage;
+use crate::TlasInstance;
 
 type DeviceResult<T> = Result<T, crate::DeviceError>;
 
@@ -319,8 +320,6 @@ impl super::Device {
 
 impl crate::Device for super::Device {
     type A = super::Api;
-
-    unsafe fn exit(self, _queue: super::Queue) {}
 
     unsafe fn create_buffer(&self, desc: &crate::BufferDescriptor) -> DeviceResult<super::Buffer> {
         let map_read = desc.usage.contains(crate::BufferUses::MAP_READ);
@@ -1327,9 +1326,15 @@ impl crate::Device for super::Device {
 
     unsafe fn create_fence(&self) -> DeviceResult<super::Fence> {
         self.counters.fences.add(1);
+        let shared_event = if self.shared.private_caps.supports_shared_event {
+            Some(self.shared.device.lock().new_shared_event())
+        } else {
+            None
+        };
         Ok(super::Fence {
             completed_value: Arc::new(atomic::AtomicU64::new(0)),
             pending_command_buffers: Vec::new(),
+            shared_event,
         })
     }
 
@@ -1425,6 +1430,10 @@ impl crate::Device for super::Device {
         &self,
         _acceleration_structure: super::AccelerationStructure,
     ) {
+        unimplemented!()
+    }
+
+    fn tlas_instance_to_bytes(&self, _instance: TlasInstance) -> Vec<u8> {
         unimplemented!()
     }
 

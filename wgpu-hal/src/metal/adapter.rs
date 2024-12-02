@@ -828,6 +828,7 @@ impl super::PrivateCapabilities {
                 && ((device.supports_family(MTLGPUFamily::Apple8)
                     && device.supports_family(MTLGPUFamily::Mac2))
                     || device.supports_family(MTLGPUFamily::Apple9)),
+            supports_shared_event: version.at_least((10, 14), (12, 0), os_is_mac),
         }
     }
 
@@ -1001,6 +1002,8 @@ impl super::PrivateCapabilities {
                 // Metal Shading Language it generates, so from `wgpu_hal`'s
                 // users' point of view, references are tightly checked.
                 uniform_bounds_check_alignment: wgt::BufferSize::new(1).unwrap(),
+                raw_tlas_instance_size: 0,
+                ray_tracing_scratch_buffer_alignment: 0,
             },
             downlevel,
         }

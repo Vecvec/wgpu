@@ -269,6 +269,7 @@ pub use crate::arena::{Arena, Handle, Range, UniqueArena};
 pub use crate::span::{SourceLocation, Span, SpanContext, WithSpan};
 #[cfg(feature = "arbitrary")]
 use arbitrary::Arbitrary;
+use diagnostic_filter::DiagnosticFilterNode;
 #[cfg(feature = "deserialize")]
 use serde::Deserialize;
 #[cfg(feature = "serialize")]
@@ -1199,6 +1200,7 @@ pub enum MathFunction {
     Inverse,
     Transpose,
     Determinant,
+    QuantizeToF16,
     // bits
     CountTrailingZeros,
     CountLeadingZeros,
@@ -2119,6 +2121,14 @@ pub struct Function {
     pub named_expressions: NamedExpressions,
     /// Block of instructions comprising the body of the function.
     pub body: Block,
+    /// The leaf of all diagnostic filter rules tree (stored in [`Module::diagnostic_filters`])
+    /// parsed on this function.
+    ///
+    /// In WGSL, this corresponds to `@diagnostic(…)` attributes.
+    ///
+    /// See [`DiagnosticFilterNode`] for details on how the tree is represented and used in
+    /// validation.
+    pub diagnostic_filter_leaf: Option<Handle<DiagnosticFilterNode>>,
 }
 
 /// The main function for a pipeline stage.
@@ -2271,4 +2281,73 @@ pub struct Module {
     pub functions: Arena<Function>,
     /// Entry points.
     pub entry_points: Vec<EntryPoint>,
+    /// Arena for all diagnostic filter rules parsed in this module, including those in functions
+    /// and statements.
+    ///
+    /// This arena contains elements of a _tree_ of diagnostic filter rules. When nodes are built
+    /// by a front-end, they refer to a parent scope
+    pub diagnostic_filters: Arena<DiagnosticFilterNode>,
+    /// The leaf of all diagnostic filter rules tree parsed from directives in this module.
+    ///
+    /// In WGSL, this corresponds to `diagnostic(…);` directives.
+    ///
+    /// See [`DiagnosticFilterNode`] for details on how the tree is represented and used in
+    /// validation.
+    pub diagnostic_filter_leaf: Option<Handle<DiagnosticFilterNode>>,
+}
+
+bitflags::bitflags! {
+    /// Ray flags used when casting rays.
+    /// Matching vulkan constants can be found in
+    /// https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/ray_common/ray_flags_section.txt
+    #[cfg_attr(feature = "serialize", derive(Serialize))]
+    #[cfg_attr(feature = "deserialize", derive(Deserialize))]
+    #[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
+    #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    pub struct RayFlag: u32 {
+        /// Force all intersections to be treated as opaque.
+        const FORCE_OPAQUE = 0x1;
+        /// Force all intersections to be treated as non-opaque.
+        const FORCE_NO_OPAQUE = 0x2;
+        /// Stop traversal after the first hit.
+        const TERMINATE_ON_FIRST_HIT = 0x4;
+        /// Don't execute the closest hit shader.
+        const SKIP_CLOSEST_HIT_SHADER = 0x8;
+        /// Cull back facing geometry.
+        const CULL_BACK_FACING = 0x10;
+        /// Cull front facing geometry.
+        const CULL_FRONT_FACING = 0x20;
+        /// Cull opaque geometry.
+        const CULL_OPAQUE = 0x40;
+        /// Cull non-opaque geometry.
+        const CULL_NO_OPAQUE = 0x80;
+        /// Skip triangular geometry.
+        const SKIP_TRIANGLES = 0x100;
+        /// Skip axis-aligned bounding boxes.
+        const SKIP_AABBS = 0x200;
+    }
+}
+
+/// Type of a ray query intersection.
+/// Matching vulkan constants can be found in
+/// <https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_ray_query.asciidoc>
+/// but the actual values are different for candidate intersections.
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[cfg_attr(feature = "deserialize", derive(Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum RayQueryIntersection {
+    /// No intersection found.
+    /// Matches `RayQueryCommittedIntersectionNoneKHR`.
+    #[default]
+    None = 0,
+    /// Intersecting with triangles.
+    /// Matches `RayQueryCommittedIntersectionTriangleKHR` and `RayQueryCandidateIntersectionTriangleKHR`.
+    Triangle = 1,
+    /// Intersecting with generated primitives.
+    /// Matches `RayQueryCommittedIntersectionGeneratedKHR`.
+    Generated = 2,
+    /// Intersecting with Axis Aligned Bounding Boxes.
+    /// Matches `RayQueryCandidateIntersectionAABBKHR`.
+    Aabb = 3,
 }

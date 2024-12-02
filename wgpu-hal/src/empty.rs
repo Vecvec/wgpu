@@ -1,5 +1,6 @@
 #![allow(unused_variables)]
 
+use crate::TlasInstance;
 use std::ops::Range;
 
 #[derive(Clone, Debug)]
@@ -163,7 +164,6 @@ impl crate::Queue for Context {
 impl crate::Device for Context {
     type A = Api;
 
-    unsafe fn exit(self, queue: Context) {}
     unsafe fn create_buffer(&self, desc: &crate::BufferDescriptor) -> DeviceResult<Resource> {
         Ok(Resource)
     }
@@ -307,6 +307,10 @@ impl crate::Device for Context {
     }
     unsafe fn destroy_acceleration_structure(&self, _acceleration_structure: Resource) {}
 
+    fn tlas_instance_to_bytes(&self, instance: TlasInstance) -> Vec<u8> {
+        vec![]
+    }
+
     fn get_internal_counters(&self) -> wgt::HalCounters {
         Default::default()
     }
@@ -343,7 +347,7 @@ impl crate::CommandEncoder for Encoder {
     #[cfg(webgl)]
     unsafe fn copy_external_image_to_texture<T>(
         &mut self,
-        src: &wgt::ImageCopyExternalImage,
+        src: &wgt::CopyExternalImageSourceInfo,
         dst: &Resource,
         dst_premultiplication: bool,
         regions: T,
