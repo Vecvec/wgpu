@@ -7508,7 +7508,8 @@ pub struct BlasTriangleGeometrySizeDescriptor {
 pub enum BlasGeometrySizeDescriptors {
     /// Triangle geometry version.
     Triangles {
-        /// Descriptor for each triangle geometry.
+        /// Descriptor for each triangle geometry. The index into
+        /// this vector in the `RayIntersection` is `geometry_index`
         descriptors: Vec<BlasTriangleGeometrySizeDescriptor>,
     },
 }
