@@ -292,10 +292,12 @@ Function definitions:
 - Returns false if all triangles that were hit by the ray were in `Blas`es that were marked as opaque.
 - The hit is considered `Candidate` if this function returns true, and the hit is considered `Committed` if 
 this function returns false.
-- There is currently no way to interact with a hit considered as `Candidate`.
 
 `rayQueryGetCommittedIntersection(rq: ptr<function, ray_query>) -> RayIntersection`
 - Returns intersection details about a hit considered `Committed`.
+
+`rayQueryGetCandidateIntersection(rq: ptr<function, ray_query>) -> RayIntersection`
+- Returns intersection details about a hit considered `Candidate`.
 
 Structure definitions:
 ````wgsl
@@ -346,3 +348,53 @@ then this is the triangle index)
 - `front_face`: whether the hit face is the front (only useful if this is a triangle).
 - `object_to_world`: matrix for converting from object-space to world-space
 - `world_to_object`: matrix for converting from world-space to object-space
+
+Constant definitions:
+
+`const FORCE_OPAQUE = 0x1;`
+- When `RayDesc::flags` contains this flag all `Blas`es as being marked as opaque.
+
+`const FORCE_NO_OPAQUE = 0x2;`
+- When `RayDesc::flags` contains this flag all `Blas`es as being not marked as opaque.
+
+`const TERMINATE_ON_FIRST_HIT = 0x4;`
+- When `RayDesc::flags` contains this flag instead of searching for the closest hit return the first hit.
+
+`const SKIP_CLOSEST_HIT_SHADER = 0x8;`
+- Unused: implemented for raytracing pipelines.
+
+`const CULL_BACK_FACING = 0x10;`
+- When `RayDesc::flags` contains this flag if `RayIntersection::front_face` is false do not return a hit.
+
+`const CULL_FRONT_FACING = 0x20;`
+- When `RayDesc::flags` contains this flag if `RayIntersection::front_face` is true do not return a hit.
+
+`const CULL_OPAQUE = 0x40;`
+- When `RayDesc::flags` contains this flag if the `Blas` a intersection is checking is marked as opaque do not return a
+hit.
+
+`const CULL_NO_OPAQUE = 0x80;`
+- When `RayDesc::flags` contains this flag if the `Blas` a intersection is checking is not marked as opaque do not return
+a hit.
+
+`const SKIP_TRIANGLES = 0x100;`
+- When `RayDesc::flags` contains this flag if the `Blas` a intersection is checking is a triangle containing blas do not 
+return a hit.
+
+`const SKIP_AABBS = 0x200;`
+- When `RayDesc::flags` contains this flag if the `Blas` a intersection is checking is a AABB containing blas do not
+return a hit.
+
+`const RAY_QUERY_INTERSECTION_NONE = 0;`
+- If `RayIntersection::kind` is equal to this the ray hit nothing.
+
+`const RAY_QUERY_INTERSECTION_TRIANGLE = 1;`
+- If `RayIntersection::kind` is equal to this the ray hit a triangle.
+
+`const RAY_QUERY_INTERSECTION_GENERATED = 2;`
+- If `RayIntersection::kind` is equal to this the ray hit a custom object, this will only happen in a committed
+intersection if a ray which intersected a bounding box for a custom object which was then committed.
+
+`const RAY_QUERY_INTERSECTION_AABB = 3;`
+- If `RayIntersection::kind` is equal to this the ray hit a AABB, this will only happen in a candidate intersection if
+the ray intersects the bounding box for a custom object.
