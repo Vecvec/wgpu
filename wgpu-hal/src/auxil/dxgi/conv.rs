@@ -94,6 +94,7 @@ pub fn map_texture_format_failable(
             block: _,
             channel: _,
         } => return None,
+        Tf::F32 | Tf::I32 | Tf::U32 => DXGI_FORMAT_UNKNOWN,
     })
 }
 

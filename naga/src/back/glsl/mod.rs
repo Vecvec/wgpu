@@ -4901,6 +4901,12 @@ fn glsl_storage_format(format: crate::StorageFormat) -> Result<&'static str, Err
                 "Support format BGRA8 is not implemented".into(),
             ))
         }
+
+        Sf::F32 | Sf::U32 | Sf::I32 => {
+            return Err(Error::Custom(
+                "Support for generic formats are not implemented".into(),
+            ))
+        }
     })
 }
 

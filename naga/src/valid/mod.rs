@@ -152,6 +152,8 @@ bitflags::bitflags! {
         /// [`AtomicFunction::Exchange { compare: None }`]: crate::AtomicFunction::Exchange
         /// [`Storage`]: crate::AddressSpace::Storage
         const SHADER_FLOAT32_ATOMIC = 1 << 21;
+        /// Support for generic storage textures e.g `texture_storage_2d<f32>`
+        const GENERIC_STORAGE_TEXTURES = 1 << 22;
     }
 }
 

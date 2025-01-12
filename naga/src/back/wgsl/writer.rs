@@ -2070,6 +2070,9 @@ const fn storage_format_str(format: crate::StorageFormat) -> &'static str {
         Sf::Rg16Snorm => "rg16snorm",
         Sf::Rgba16Unorm => "rgba16unorm",
         Sf::Rgba16Snorm => "rgba16snorm",
+        Sf::F32 => "f32",
+        Sf::I32 => "i32",
+        Sf::U32 => "u32",
     }
 }
 

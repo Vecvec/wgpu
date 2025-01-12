@@ -167,6 +167,7 @@ impl super::AdapterShared {
                     }
                 },
             },
+            Tf::F32 | Tf::I32 | Tf::U32 => unimplemented!("generic storage textures are not supported"),
         };
 
         super::TextureFormatDesc {

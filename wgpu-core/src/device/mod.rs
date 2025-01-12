@@ -457,6 +457,10 @@ pub fn create_validator(
         Caps::SUBGROUP_VERTEX_STAGE,
         features.contains(wgt::Features::SUBGROUP_VERTEX),
     );
+    caps.set(
+        Caps::GENERIC_STORAGE_TEXTURES,
+        features.contains(wgt::Features::GENERIC_STORAGE_TEXTURES),
+    );
 
     naga::valid::Validator::new(flags, caps)
 }

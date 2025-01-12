@@ -659,6 +659,20 @@ pub enum StorageFormat {
     Rg16Snorm,
     Rgba16Unorm,
     Rgba16Snorm,
+
+    // Generic formats
+    F32,
+    I32,
+    U32,
+}
+
+impl StorageFormat {
+    fn is_generic(&self) -> bool {
+        match self {
+            Self::F32 | Self::I32 | Self::U32 => true,
+            _ => false,
+        }
+    }
 }
 
 /// Sub-class of the image type.

@@ -834,6 +834,10 @@ impl Device {
             }
         }
 
+        if desc.format.is_generic() {
+            return Err(CreateTextureError::GenericFormat(desc.format));
+        }
+
         let format_features = self
             .describe_format_features(desc.format)
             .map_err(|error| CreateTextureError::MissingFeatures(desc.format, error))?;
@@ -918,6 +922,10 @@ impl Device {
         for format in desc.view_formats.iter() {
             if desc.format == *format {
                 continue;
+            }
+            // this is only in case the next error gets looser and to give the user a better message
+            if format.is_generic() {
+                return Err(CreateTextureError::GenericFormat(*format));
             }
             if desc.format.remove_srgb_suffix() != format.remove_srgb_suffix() {
                 return Err(CreateTextureError::InvalidViewFormat(*format, desc.format));
@@ -2495,7 +2503,24 @@ impl Device {
                 format,
                 view_dimension,
             } => {
-                if format != view.desc.format {
+                if format.is_generic() {
+                    match format.generic_type(self.features) {
+                        None => return Err(Error::FormatGenericUnsupported {
+                            binding,
+                            format,
+                        }),
+                        Some(generic_format) => {
+                            if format != generic_format {
+                                return Err(Error::InvalidStorageTextureGenericType {
+                                    binding,
+                                    layout_generic_type: format,
+                                    view_format: view.desc.format,
+                                    view_generic_type: generic_format,
+                                })
+                            }
+                        }
+                    }
+                } else if format != view.desc.format {
                     return Err(Error::InvalidStorageTextureFormat {
                         binding,
                         layout_format: format,

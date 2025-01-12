@@ -193,6 +193,24 @@ pub enum CreateBindGroupError {
     ResourceUsageCompatibility(#[from] ResourceUsageCompatibilityError),
     #[error(transparent)]
     InvalidResource(#[from] InvalidResourceError),
+    #[error("The specified format {format:?} at binding {binding} does not support conversion to generic with the current feature")]
+    FormatGenericUnsupported {
+        binding: u32,
+        format: wgt::TextureFormat,
+    },
+    #[error(
+        "Storage texture binding {} expects generic type {:?}, but was given a view with format {:?} (generic type {:?})",
+        binding,
+        layout_generic_type,
+        view_format,
+        view_generic_type
+    )]
+    InvalidStorageTextureGenericType {
+        binding: u32,
+        layout_generic_type: wgt::TextureFormat,
+        view_format: wgt::TextureFormat,
+        view_generic_type: wgt::TextureFormat,
+    },
 }
 
 #[derive(Clone, Debug, Error)]

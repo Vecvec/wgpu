@@ -968,6 +968,10 @@ bitflags::bitflags! {
         ///
         /// [VK_KHR_external_memory_win32]: https://registry.khronos.org/vulkan/specs/latest/man/html/VK_KHR_external_memory_win32.html
         const VULKAN_EXTERNAL_MEMORY_WIN32 = 1 << 63;
+
+        // Random bit that's not used.
+        /// Enables generic storage texture formats
+        const GENERIC_STORAGE_TEXTURES = 1 << 46;
     }
 }
 
@@ -2833,6 +2837,12 @@ pub enum TextureFormat {
         /// ASTC RGBA channel
         channel: AstcChannel,
     },
+    /// Generic format, allowed only in bind group layouts for storage textures
+    F32,
+    /// Generic format, allowed only in bind group layouts for storage textures
+    I32,
+    /// Generic format, allowed only in bind group layouts for storage textures
+    U32,
 }
 
 #[cfg(any(feature = "serde", test))]
@@ -2928,6 +2938,9 @@ impl<'de> Deserialize<'de> for TextureFormat {
                     "eac-r11snorm" => TextureFormat::EacR11Snorm,
                     "eac-rg11unorm" => TextureFormat::EacRg11Unorm,
                     "eac-rg11snorm" => TextureFormat::EacRg11Snorm,
+                    "f32" => TextureFormat::F32,
+                    "i32" => TextureFormat::I32,
+                    "u32" => TextureFormat::U32,
                     other => {
                         if let Some(parts) = other.strip_prefix("astc-") {
                             let (block, channel) = parts
@@ -3083,6 +3096,9 @@ impl Serialize for TextureFormat {
                 s = format!("astc-{block}-{channel}");
                 &s
             }
+            TextureFormat::F32 => "f32",
+            TextureFormat::I32 => "i32",
+            TextureFormat::U32 => "u32",
         };
         serializer.serialize_str(name)
     }
@@ -3220,6 +3236,8 @@ impl TextureFormat {
     /// Returns the dimension of a [block](https://gpuweb.github.io/gpuweb/#texel-block) of texels.
     ///
     /// Uncompressed formats have a block dimension of `(1, 1)`.
+    ///
+    /// Panics if the format is generic
     #[must_use]
     pub fn block_dimensions(&self) -> (u32, u32) {
         match *self {
@@ -3316,6 +3334,7 @@ impl TextureFormat {
                 AstcBlock::B12x10 => (12, 10),
                 AstcBlock::B12x12 => (12, 12),
             },
+            TextureFormat::F32 | TextureFormat::I32 | TextureFormat::U32 => (1, 1),
         }
     }
 
@@ -3419,6 +3438,7 @@ impl TextureFormat {
                 AstcChannel::Hdr => Features::TEXTURE_COMPRESSION_ASTC_HDR,
                 AstcChannel::Unorm | AstcChannel::UnormSrgb => Features::TEXTURE_COMPRESSION_ASTC,
             },
+            TextureFormat::F32 | TextureFormat::I32 | TextureFormat::U32 => Features::GENERIC_STORAGE_TEXTURES,
         }
     }
 
@@ -3429,6 +3449,7 @@ impl TextureFormat {
     pub fn guaranteed_format_features(&self, device_features: Features) -> TextureFormatFeatures {
         // Multisampling
         let none = TextureFormatFeatureFlags::empty();
+        let storage_only = TextureUsages::STORAGE_BINDING;
         let msaa = TextureFormatFeatureFlags::MULTISAMPLE_X4;
         let msaa_resolve = msaa | TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE;
 
@@ -3545,6 +3566,9 @@ impl TextureFormat {
             Self::EacRg11Snorm =>         (        none,      basic),
 
             Self::Astc { .. } =>          (        none,      basic),
+            Self::U32
+            | Self::F32
+            | Self::I32 =>                (       s_all,storage_only),
         };
 
         // Get whether the format is filterable, taking features into account
@@ -3599,7 +3623,8 @@ impl TextureFormat {
             | Self::Rg16Float
             | Self::Rgba16Float
             | Self::Rgb10a2Unorm
-            | Self::Rg11b10Ufloat => Some(float),
+            | Self::Rg11b10Ufloat
+            | Self::F32 => Some(float),
 
             Self::R32Float | Self::Rg32Float | Self::Rgba32Float => Some(float32_sample_type),
 
@@ -3612,7 +3637,8 @@ impl TextureFormat {
             | Self::R32Uint
             | Self::Rg32Uint
             | Self::Rgba32Uint
-            | Self::Rgb10a2Uint => Some(uint),
+            | Self::Rgb10a2Uint
+            | Self::U32 => Some(uint),
 
             Self::R8Sint
             | Self::Rg8Sint
@@ -3622,7 +3648,8 @@ impl TextureFormat {
             | Self::Rgba16Sint
             | Self::R32Sint
             | Self::Rg32Sint
-            | Self::Rgba32Sint => Some(sint),
+            | Self::Rgba32Sint
+            | Self::I32 => Some(sint),
 
             Self::Stencil8 => Some(uint),
             Self::Depth16Unorm | Self::Depth24Plus | Self::Depth32Float => Some(depth),
@@ -3708,6 +3735,7 @@ impl TextureFormat {
     ///  - the format is a multi-planar format and no `aspect` was provided
     ///  - the format is `Depth24Plus`
     ///  - the format is `Depth24PlusStencil8` and `aspect` is depth.
+    ///  - the format is generic
     #[must_use]
     pub fn block_copy_size(&self, aspect: Option<TextureAspect>) -> Option<u32> {
         match *self {
@@ -3791,6 +3819,8 @@ impl TextureFormat {
             | Self::EacRg11Snorm => Some(16),
 
             Self::Astc { .. } => Some(16),
+
+            Self::I32 | Self::U32 | Self::F32 => None,
         }
     }
 
@@ -3874,7 +3904,10 @@ impl TextureFormat {
             | Self::EacR11Snorm
             | Self::EacRg11Unorm
             | Self::EacRg11Snorm
-            | Self::Astc { .. } => None,
+            | Self::Astc { .. }
+            | Self::F32
+            | Self::I32
+            | Self::U32 => None,
         }
     }
 
@@ -3956,7 +3989,10 @@ impl TextureFormat {
             | Self::EacR11Snorm
             | Self::EacRg11Unorm
             | Self::EacRg11Snorm
-            | Self::Astc { .. } => None,
+            | Self::Astc { .. }
+            | Self::F32
+            | Self::I32
+            | Self::U32 => None,
         }
     }
 
@@ -4051,6 +4087,11 @@ impl TextureFormat {
             | Self::Etc2Rgba8UnormSrgb => 4,
 
             Self::Astc { .. } => 4,
+
+            // It might not be 4...
+            Self::F32
+            | Self::I32
+            | Self::U32 => 4,
         }
     }
 
@@ -4106,6 +4147,64 @@ impl TextureFormat {
     #[must_use]
     pub fn is_srgb(&self) -> bool {
         *self != self.remove_srgb_suffix()
+    }
+
+    /// Returns `true` for generic formats.
+    #[must_use]
+    pub fn is_generic(&self) -> bool {
+        match self {
+            Self::F32 | Self::I32 | Self::U32 => true,
+            _ => false,
+        }
+    }
+
+    /// Returns the type of generic that the type can be converted into, if any. Returns None if the
+    /// format is not supported to be converted with the current features
+    #[must_use]
+    pub fn generic_type(&self, features: Features) -> Option<Self> {
+        match self {
+            Self::F32
+            | Self::Rgba8Unorm
+            | Self::Rgba8Snorm
+            | Self::R32Float
+            | Self::Rg32Float
+            | Self::Rgba32Float
+            | Self::Rgba16Float
+            | Self::Rg16Float
+            | Self::R16Float
+            | Self::Rgba16Unorm
+            | Self::Rg8Unorm
+            | Self::R16Unorm
+            | Self::R8Unorm
+            | Self::Rgba16Snorm
+            | Self::Rg8Snorm
+            | Self::R16Snorm
+            | Self::R8Snorm
+            | Self::Rg11b10Ufloat
+            | Self::Rgb10a2Unorm
+            | Self::Rgb10a2Uint => features.contains(Features::GENERIC_STORAGE_TEXTURES).then_some(Self::F32),
+            Self::I32
+            | Self::Rgba8Sint
+            | Self::R32Sint
+            | Self::Rg32Sint
+            | Self::Rgba32Sint
+            | Self::Rgba16Sint
+            | Self::Rg16Sint
+            | Self::Rg8Sint
+            | Self::R16Sint
+            | Self::R8Sint => features.contains(Features::GENERIC_STORAGE_TEXTURES).then_some(Self::I32),
+            Self::U32
+            | Self::Rgba8Uint
+            | Self::R32Uint
+            | Self::Rg32Uint
+            | Self::Rgba32Uint
+            | Self::Rgba16Uint
+            | Self::Rg16Uint
+            | Self::Rg8Uint
+            | Self::R16Uint
+            | Self::R8Uint => features.contains(Features::GENERIC_STORAGE_TEXTURES).then_some(Self::U32),
+            _ => None,
+        }
     }
 }
 

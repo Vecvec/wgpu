@@ -193,6 +193,9 @@ impl crate::StorageFormat {
             Sf::Rg16Snorm => "rg16snorm",
             Sf::Rgba16Unorm => "rgba16unorm",
             Sf::Rgba16Snorm => "rgba16snorm",
+            Sf::F32 => "f32",
+            Sf::I32 => "i32",
+            Sf::U32 => "u32",
         }
     }
 }

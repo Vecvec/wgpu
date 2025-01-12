@@ -750,6 +750,8 @@ impl PhysicalDeviceFeatures {
             supports_bgra8unorm_storage(instance, phd, caps.device_api_version),
         );
 
+        features.set(F::GENERIC_STORAGE_TEXTURES, self.core.shader_storage_image_read_without_format != 0 && self.core.shader_storage_image_write_without_format != 0);
+
         features.set(
             F::FLOAT32_FILTERABLE,
             is_float32_filterable_supported(instance, phd),
@@ -1806,6 +1808,11 @@ impl super::Adapter {
 
             if features.contains(wgt::Features::EXPERIMENTAL_RAY_QUERY) {
                 capabilities.push(spv::Capability::RayQueryKHR);
+            }
+
+            if features.contains(wgt::Features::GENERIC_STORAGE_TEXTURES) {
+                capabilities.push(spv::Capability::StorageImageReadWithoutFormat);
+                capabilities.push(spv::Capability::StorageImageWriteWithoutFormat);
             }
 
             if features.contains(wgt::Features::SHADER_INT64) {

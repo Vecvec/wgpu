@@ -1164,6 +1164,7 @@ impl crate::Adapter for super::Adapter {
                 block: _,
                 channel: AstcChannel::Hdr,
             } => astc_hdr_features,
+            Tf::F32 | Tf::I32 | Tf::U32 => empty,
         }
     }
 

@@ -330,6 +330,10 @@ fn map_storage_format_to_naga(format: wgt::TextureFormat) -> Option<naga::Storag
         Tf::Rgba16Unorm => Sf::Rgba16Unorm,
         Tf::Rgba16Snorm => Sf::Rgba16Snorm,
 
+        Tf::F32 => Sf::F32,
+        Tf::I32 => Sf::I32,
+        Tf::U32 => Sf::U32,
+
         _ => return None,
     })
 }
@@ -385,6 +389,9 @@ fn map_storage_format_from_naga(format: naga::StorageFormat) -> wgt::TextureForm
         Sf::Rg16Snorm => Tf::Rg16Snorm,
         Sf::Rgba16Unorm => Tf::Rgba16Unorm,
         Sf::Rgba16Snorm => Tf::Rgba16Snorm,
+        Sf::F32 => Tf::F32,
+        Sf::I32 => Tf::I32,
+        Sf::U32 => Tf::U32,
     }
 }
 
@@ -760,6 +767,9 @@ impl NumericType {
                 block: _,
                 channel: _,
             } => (NumericDimension::Vector(Vs::Quad), Scalar::F32),
+            Tf::F32 => (NumericDimension::Vector(Vs::Quad), Scalar::F32),
+            Tf::I32 => (NumericDimension::Vector(Vs::Quad), Scalar::I32),
+            Tf::U32 => (NumericDimension::Vector(Vs::Quad), Scalar::U32),
         };
 
         NumericType {

@@ -319,7 +319,8 @@ impl super::Adapter {
             | wgt::Features::RG11B10UFLOAT_RENDERABLE
             | wgt::Features::DUAL_SOURCE_BLENDING
             | wgt::Features::TEXTURE_FORMAT_NV12
-            | wgt::Features::FLOAT32_FILTERABLE;
+            | wgt::Features::FLOAT32_FILTERABLE
+            | wgt::Features::GENERIC_STORAGE_TEXTURES;
 
         //TODO: in order to expose this, we need to run a compute shader
         // that extract the necessary statistics out of the D3D12 result.

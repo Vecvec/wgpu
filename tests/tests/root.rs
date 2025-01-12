@@ -57,4 +57,6 @@ mod vertex_indices;
 mod write_texture;
 mod zero_init_texture_after_discard;
 
+mod generic_textures;
+
 wgpu_test::gpu_test_main!();

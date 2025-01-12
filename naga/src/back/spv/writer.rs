@@ -819,6 +819,16 @@ impl Writer {
                     crate::ImageClass::Sampled { .. } => true,
                     crate::ImageClass::Depth { .. } => true,
                     crate::ImageClass::Storage { format, .. } => {
+                        if format.is_generic() {
+                            self.require_any(
+                                "generic textures",
+                                &[spirv::Capability::StorageImageReadWithoutFormat],
+                            )?;
+                            self.require_any(
+                                "generic textures",
+                                &[spirv::Capability::StorageImageWriteWithoutFormat],
+                            )?;
+                        }
                         self.request_image_format_capabilities(format.into())?;
                         false
                     }

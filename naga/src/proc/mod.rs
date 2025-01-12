@@ -64,6 +64,9 @@ impl From<super::StorageFormat> for super::Scalar {
             Sf::Rg16Snorm => Sk::Float,
             Sf::Rgba16Unorm => Sk::Float,
             Sf::Rgba16Snorm => Sk::Float,
+            Sf::F32 => Sk::Float,
+            Sf::I32 => Sk::Sint,
+            Sf::U32 => Sk::Uint,
         };
         super::Scalar { kind, width: 4 }
     }

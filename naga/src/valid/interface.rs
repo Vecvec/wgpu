@@ -543,6 +543,22 @@ impl super::Validator {
                                 ));
                             }
                         }
+                        crate::ImageClass::Storage {
+                            format:
+                            crate::StorageFormat::F32
+                            | crate::StorageFormat::I32
+                            | crate::StorageFormat::U32,
+                            ..
+                        } => {
+                            if !self
+                                .capabilities
+                                .contains(Capabilities::GENERIC_STORAGE_TEXTURES)
+                            {
+                                return Err(GlobalVariableError::UnsupportedCapability(
+                                    Capabilities::GENERIC_STORAGE_TEXTURES,
+                                ));
+                            }
+                        }
                         _ => {}
                     },
                     crate::TypeInner::Sampler { .. }

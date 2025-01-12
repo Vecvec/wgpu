@@ -107,6 +107,9 @@ pub fn map_storage_format(word: &str, span: Span) -> Result<crate::StorageFormat
         "rgba32sint" => Sf::Rgba32Sint,
         "rgba32float" => Sf::Rgba32Float,
         "bgra8unorm" => Sf::Bgra8Unorm,
+        "f32" => Sf::F32,
+        "i32" => Sf::I32,
+        "u32" => Sf::U32,
         _ => return Err(Error::UnknownStorageFormat(span)),
     })
 }

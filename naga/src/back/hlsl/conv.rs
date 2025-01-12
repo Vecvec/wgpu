@@ -143,6 +143,10 @@ impl crate::StorageFormat {
 
             Self::Rgba8Uint | Self::Rgba16Uint | Self::Rgba32Uint | Self::Rgb10a2Uint => "uint4",
             Self::Rgba8Sint | Self::Rgba16Sint | Self::Rgba32Sint => "int4",
+
+            Self::F32 => "float4",
+            Self::I32 => "int4",
+            Self::U32 => "uint4",
         }
     }
 }

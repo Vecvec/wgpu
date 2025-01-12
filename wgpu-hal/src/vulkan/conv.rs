@@ -150,6 +150,7 @@ impl super::PrivateCapabilities {
                     AstcBlock::B12x12 => F::ASTC_12X12_SFLOAT_BLOCK_EXT,
                 },
             },
+            Tf::F32 | Tf::I32 | Tf::U32 => F::UNDEFINED,
         }
     }
 }
