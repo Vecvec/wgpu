@@ -667,8 +667,8 @@ pub enum StorageFormat {
 }
 
 impl StorageFormat {
-    fn is_generic(&self) -> bool {
-        match self {
+    const fn is_generic(&self) -> bool {
+        match *self {
             Self::F32 | Self::I32 | Self::U32 => true,
             _ => false,
         }

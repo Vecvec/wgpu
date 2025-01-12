@@ -1516,7 +1516,9 @@ pub enum CreateTextureError {
     MissingFeatures(wgt::TextureFormat, #[source] MissingFeatures),
     #[error(transparent)]
     MissingDownlevelFlags(#[from] MissingDownlevelFlags),
-    #[error("Texture format {0:?} is generic and cannot be used as a texture or view texture format")]
+    #[error(
+        "Texture format {0:?} is generic and cannot be used as a texture or view texture format"
+    )]
     GenericFormat(wgt::TextureFormat),
 }
 

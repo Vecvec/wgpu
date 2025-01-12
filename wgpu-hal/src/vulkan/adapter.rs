@@ -750,7 +750,11 @@ impl PhysicalDeviceFeatures {
             supports_bgra8unorm_storage(instance, phd, caps.device_api_version),
         );
 
-        features.set(F::GENERIC_STORAGE_TEXTURES, self.core.shader_storage_image_read_without_format != 0 && self.core.shader_storage_image_write_without_format != 0);
+        features.set(
+            F::GENERIC_STORAGE_TEXTURES,
+            self.core.shader_storage_image_read_without_format != 0
+                && self.core.shader_storage_image_write_without_format != 0,
+        );
 
         features.set(
             F::FLOAT32_FILTERABLE,

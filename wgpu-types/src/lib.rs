@@ -3438,7 +3438,9 @@ impl TextureFormat {
                 AstcChannel::Hdr => Features::TEXTURE_COMPRESSION_ASTC_HDR,
                 AstcChannel::Unorm | AstcChannel::UnormSrgb => Features::TEXTURE_COMPRESSION_ASTC,
             },
-            TextureFormat::F32 | TextureFormat::I32 | TextureFormat::U32 => Features::GENERIC_STORAGE_TEXTURES,
+            TextureFormat::F32 | TextureFormat::I32 | TextureFormat::U32 => {
+                Features::GENERIC_STORAGE_TEXTURES
+            }
         }
     }
 
@@ -4089,9 +4091,7 @@ impl TextureFormat {
             Self::Astc { .. } => 4,
 
             // It might not be 4...
-            Self::F32
-            | Self::I32
-            | Self::U32 => 4,
+            Self::F32 | Self::I32 | Self::U32 => 4,
         }
     }
 
@@ -4182,7 +4182,9 @@ impl TextureFormat {
             | Self::R8Snorm
             | Self::Rg11b10Ufloat
             | Self::Rgb10a2Unorm
-            | Self::Rgb10a2Uint => features.contains(Features::GENERIC_STORAGE_TEXTURES).then_some(Self::F32),
+            | Self::Rgb10a2Uint => features
+                .contains(Features::GENERIC_STORAGE_TEXTURES)
+                .then_some(Self::F32),
             Self::I32
             | Self::Rgba8Sint
             | Self::R32Sint
@@ -4192,7 +4194,9 @@ impl TextureFormat {
             | Self::Rg16Sint
             | Self::Rg8Sint
             | Self::R16Sint
-            | Self::R8Sint => features.contains(Features::GENERIC_STORAGE_TEXTURES).then_some(Self::I32),
+            | Self::R8Sint => features
+                .contains(Features::GENERIC_STORAGE_TEXTURES)
+                .then_some(Self::I32),
             Self::U32
             | Self::Rgba8Uint
             | Self::R32Uint
@@ -4202,7 +4206,9 @@ impl TextureFormat {
             | Self::Rg16Uint
             | Self::Rg8Uint
             | Self::R16Uint
-            | Self::R8Uint => features.contains(Features::GENERIC_STORAGE_TEXTURES).then_some(Self::U32),
+            | Self::R8Uint => features
+                .contains(Features::GENERIC_STORAGE_TEXTURES)
+                .then_some(Self::U32),
             _ => None,
         }
     }

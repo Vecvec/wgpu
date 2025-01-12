@@ -545,9 +545,9 @@ impl super::Validator {
                         }
                         crate::ImageClass::Storage {
                             format:
-                            crate::StorageFormat::F32
-                            | crate::StorageFormat::I32
-                            | crate::StorageFormat::U32,
+                                crate::StorageFormat::F32
+                                | crate::StorageFormat::I32
+                                | crate::StorageFormat::U32,
                             ..
                         } => {
                             if !self

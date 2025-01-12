@@ -2505,10 +2505,7 @@ impl Device {
             } => {
                 if format.is_generic() {
                     match format.generic_type(self.features) {
-                        None => return Err(Error::FormatGenericUnsupported {
-                            binding,
-                            format,
-                        }),
+                        None => return Err(Error::FormatGenericUnsupported { binding, format }),
                         Some(generic_format) => {
                             if format != generic_format {
                                 return Err(Error::InvalidStorageTextureGenericType {
@@ -2516,7 +2513,7 @@ impl Device {
                                     layout_generic_type: format,
                                     view_format: view.desc.format,
                                     view_generic_type: generic_format,
-                                })
+                                });
                             }
                         }
                     }
