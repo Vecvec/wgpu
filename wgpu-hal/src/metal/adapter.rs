@@ -307,6 +307,7 @@ impl crate::Adapter for super::Adapter {
                     Tfc::empty()
                 }
             }
+            Tf::F32 | Tf::I32 | Tf::U32 => Tfc::empty(),
         };
 
         Tfc::COPY_SRC | Tfc::COPY_DST | Tfc::SAMPLED | Tfc::STORAGE_READ_ONLY | extra
@@ -1161,6 +1162,7 @@ impl super::PrivateCapabilities {
                     AstcBlock::B12x12 => ASTC_12x12_HDR,
                 },
             },
+            Tf::F32 | Tf::I32 | Tf::U32 => unreachable!("unsupported format"),
         }
     }
 
