@@ -970,7 +970,20 @@ bitflags::bitflags! {
         const VULKAN_EXTERNAL_MEMORY_WIN32 = 1 << 63;
 
         // Random bit that's not used.
-        /// Enables generic storage texture formats
+        /// Enables generic storage texture formats in wgsl this is `texture_storage_2d<f32>`,
+        /// `texture_storage_2d<i32>`, `texture_storage_2d<u32>` dependent on the type.
+        ///
+        /// In Vulkan this corresponds to `StorageImageReadWithoutFormat` and `StorageImageWriteWithoutFormat`
+        ///
+        /// Only enables a subset of all formats to be able to be generic, to query these use
+        /// [`TextureFormat::generic_type()`] and check if it is some.
+        ///
+        /// Supported platforms
+        /// - Vulkan (if mentioned flags are enabled).
+        /// - Dx12
+        ///
+        /// Supportable platforms
+        /// - Metal
         const GENERIC_STORAGE_TEXTURES = 1 << 46;
     }
 }
@@ -2414,6 +2427,8 @@ bitflags::bitflags! {
         const STORAGE_READ_WRITE = 1 << 8;
         /// If not present, the texture can't be blended into the render target.
         const BLENDABLE = 1 << 9;
+        /// If present feature can be used as generic (see [`TextureFormat::generic_type`])
+        const STORAGE_GENERIC = 1 << 10;
     }
 }
 
@@ -3236,8 +3251,7 @@ impl TextureFormat {
     /// Returns the dimension of a [block](https://gpuweb.github.io/gpuweb/#texel-block) of texels.
     ///
     /// Uncompressed formats have a block dimension of `(1, 1)`.
-    ///
-    /// Panics if the format is generic
+    // This also returns (1, 1) for generic textures even though we don't know if they are compressed.
     #[must_use]
     pub fn block_dimensions(&self) -> (u32, u32) {
         match *self {
@@ -3583,6 +3597,10 @@ impl TextureFormat {
 
         flags.set(TextureFormatFeatureFlags::FILTERABLE, is_filterable);
         flags.set(TextureFormatFeatureFlags::BLENDABLE, is_blendable);
+
+        if let Some(_) = self.generic_type(device_features) {
+            flags.set(TextureFormatFeatureFlags::STORAGE_GENERIC)
+        }
 
         TextureFormatFeatures {
             allowed_usages,
