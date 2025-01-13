@@ -3599,7 +3599,7 @@ impl TextureFormat {
         flags.set(TextureFormatFeatureFlags::BLENDABLE, is_blendable);
 
         if let Some(_) = self.generic_type(device_features) {
-            flags.set(TextureFormatFeatureFlags::STORAGE_GENERIC)
+            flags.insert(TextureFormatFeatureFlags::STORAGE_GENERIC)
         }
 
         TextureFormatFeatures {
