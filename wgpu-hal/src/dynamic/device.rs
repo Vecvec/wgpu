@@ -5,7 +5,7 @@ use crate::{
     GetAccelerationStructureBuildSizesDescriptor, Label, MemoryRange, PipelineCacheDescriptor,
     PipelineCacheError, PipelineError, PipelineLayoutDescriptor, RenderPipelineDescriptor,
     SamplerDescriptor, ShaderError, ShaderInput, ShaderModuleDescriptor, TextureDescriptor,
-    TextureViewDescriptor,
+    TextureViewDescriptor, TlasInstance,
 };
 
 use super::{
@@ -16,14 +16,13 @@ use super::{
 };
 
 pub trait DynDevice: DynResource {
-    unsafe fn exit(self: Box<Self>, queue: Box<dyn DynQueue>);
-
     unsafe fn create_buffer(
         &self,
         desc: &BufferDescriptor,
     ) -> Result<Box<dyn DynBuffer>, DeviceError>;
 
     unsafe fn destroy_buffer(&self, buffer: Box<dyn DynBuffer>);
+    unsafe fn add_raw_buffer(&self, buffer: &dyn DynBuffer);
 
     unsafe fn map_buffer(
         &self,
@@ -41,6 +40,8 @@ pub trait DynDevice: DynResource {
         desc: &TextureDescriptor,
     ) -> Result<Box<dyn DynTexture>, DeviceError>;
     unsafe fn destroy_texture(&self, texture: Box<dyn DynTexture>);
+    unsafe fn add_raw_texture(&self, texture: &dyn DynTexture);
+
     unsafe fn create_texture_view(
         &self,
         texture: &dyn DynTexture,
@@ -57,7 +58,6 @@ pub trait DynDevice: DynResource {
         &self,
         desc: &CommandEncoderDescriptor<dyn DynQueue>,
     ) -> Result<Box<dyn DynCommandEncoder>, DeviceError>;
-    unsafe fn destroy_command_encoder(&self, pool: Box<dyn DynCommandEncoder>);
 
     unsafe fn create_bind_group_layout(
         &self,
@@ -157,16 +157,13 @@ pub trait DynDevice: DynResource {
         &self,
         acceleration_structure: Box<dyn DynAccelerationStructure>,
     );
+    fn tlas_instance_to_bytes(&self, instance: TlasInstance) -> Vec<u8>;
 
     fn get_internal_counters(&self) -> wgt::HalCounters;
     fn generate_allocator_report(&self) -> Option<wgt::AllocatorReport>;
 }
 
 impl<D: Device + DynResource> DynDevice for D {
-    unsafe fn exit(self: Box<Self>, queue: Box<dyn DynQueue>) {
-        unsafe { D::exit(*self, queue.unbox()) }
-    }
-
     unsafe fn create_buffer(
         &self,
         desc: &BufferDescriptor,
@@ -176,6 +173,10 @@ impl<D: Device + DynResource> DynDevice for D {
 
     unsafe fn destroy_buffer(&self, buffer: Box<dyn DynBuffer>) {
         unsafe { D::destroy_buffer(self, buffer.unbox()) };
+    }
+    unsafe fn add_raw_buffer(&self, buffer: &dyn DynBuffer) {
+        let buffer = buffer.expect_downcast_ref();
+        unsafe { D::add_raw_buffer(self, buffer) };
     }
 
     unsafe fn map_buffer(
@@ -215,6 +216,11 @@ impl<D: Device + DynResource> DynDevice for D {
 
     unsafe fn destroy_texture(&self, texture: Box<dyn DynTexture>) {
         unsafe { D::destroy_texture(self, texture.unbox()) };
+    }
+
+    unsafe fn add_raw_texture(&self, texture: &dyn DynTexture) {
+        let texture = texture.expect_downcast_ref();
+        unsafe { D::add_raw_texture(self, texture) };
     }
 
     unsafe fn create_texture_view(
@@ -259,10 +265,6 @@ impl<D: Device + DynResource> DynDevice for D {
         };
         unsafe { D::create_command_encoder(self, &desc) }
             .map(|b| -> Box<dyn DynCommandEncoder> { Box::new(b) })
-    }
-
-    unsafe fn destroy_command_encoder(&self, encoder: Box<dyn DynCommandEncoder>) {
-        unsafe { D::destroy_command_encoder(self, encoder.unbox()) };
     }
 
     unsafe fn create_bind_group_layout(
@@ -512,6 +514,10 @@ impl<D: Device + DynResource> DynDevice for D {
         acceleration_structure: Box<dyn DynAccelerationStructure>,
     ) {
         unsafe { D::destroy_acceleration_structure(self, acceleration_structure.unbox()) }
+    }
+
+    fn tlas_instance_to_bytes(&self, instance: TlasInstance) -> Vec<u8> {
+        D::tlas_instance_to_bytes(self, instance)
     }
 
     fn get_internal_counters(&self) -> wgt::HalCounters {

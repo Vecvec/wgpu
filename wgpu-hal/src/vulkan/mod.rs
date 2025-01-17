@@ -29,23 +29,29 @@ mod command;
 mod conv;
 mod device;
 mod instance;
+mod sampler;
 
 use std::{
     borrow::Borrow,
-    collections::HashSet,
     ffi::{CStr, CString},
     fmt, mem,
     num::NonZeroU32,
+    ops::DerefMut,
     sync::Arc,
 };
 
 use arrayvec::ArrayVec;
 use ash::{ext, khr, vk};
+use hashbrown::{HashMap, HashSet};
 use parking_lot::{Mutex, RwLock};
+use rustc_hash::FxHasher;
 use wgt::InternalCounter;
 
 const MILLIS_TO_NANOS: u64 = 1_000_000;
 const MAX_TOTAL_ATTACHMENTS: usize = crate::MAX_COLOR_ATTACHMENTS * 2 + 1;
+
+// NOTE: This type alias is similar to rustc_hash::FxHashMap but works with hashbrown.
+type FxHashMap<T, U> = HashMap<T, U, core::hash::BuildHasherDefault<FxHasher>>;
 
 #[derive(Clone, Debug)]
 pub struct Api;
@@ -355,6 +361,13 @@ struct Swapchain {
     /// index as the image index, but we need to specify the semaphore as an argument
     /// to the acquire_next_image function which is what tells us which image to use.
     next_semaphore_index: usize,
+    /// The present timing information which will be set in the next call to [`present()`](crate::Queue::present()).
+    ///
+    /// # Safety
+    ///
+    /// This must only be set if [`wgt::Features::VULKAN_GOOGLE_DISPLAY_TIMING`] is enabled, and
+    /// so the VK_GOOGLE_display_timing extension is present.
+    next_present_time: Option<vk::PresentTimeGOOGLE>,
 }
 
 impl Swapchain {
@@ -373,6 +386,53 @@ pub struct Surface {
     functor: khr::surface::Instance,
     instance: Arc<InstanceShared>,
     swapchain: RwLock<Option<Swapchain>>,
+}
+
+impl Surface {
+    /// Get the raw Vulkan swapchain associated with this surface.
+    ///
+    /// Returns [`None`] if the surface is not configured.
+    pub fn raw_swapchain(&self) -> Option<vk::SwapchainKHR> {
+        let read = self.swapchain.read();
+        read.as_ref().map(|it| it.raw)
+    }
+
+    /// Set the present timing information which will be used for the next [presentation](crate::Queue::present()) of this surface,
+    /// using [VK_GOOGLE_display_timing].
+    ///
+    /// This can be used to give an id to presentations, for future use of [`vk::PastPresentationTimingGOOGLE`].
+    /// Note that `wgpu-hal` does *not* provide a way to use that API - you should manually access this through [`ash`].
+    ///
+    /// This can also be used to add a "not before" timestamp to the presentation.
+    ///
+    /// The exact semantics of the fields are also documented in the [specification](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentTimeGOOGLE.html) for the extension.
+    ///
+    /// # Panics
+    ///
+    /// - If the surface hasn't been configured.
+    /// - If the device doesn't [support present timing](wgt::Features::VULKAN_GOOGLE_DISPLAY_TIMING).
+    ///
+    /// [VK_GOOGLE_display_timing]: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_GOOGLE_display_timing.html
+    #[track_caller]
+    pub fn set_next_present_time(&self, present_timing: vk::PresentTimeGOOGLE) {
+        let mut swapchain = self.swapchain.write();
+        let swapchain = swapchain
+            .as_mut()
+            .expect("Surface should have been configured");
+        let features = wgt::Features::VULKAN_GOOGLE_DISPLAY_TIMING;
+        if swapchain.device.features.contains(features) {
+            swapchain.next_present_time = Some(present_timing);
+        } else {
+            // Ideally we'd use something like `device.required_features` here, but that's in `wgpu-core`, which we are a dependency of
+            panic!(
+                concat!(
+                    "Tried to set display timing properties ",
+                    "without the corresponding feature ({:?}) enabled."
+                ),
+                features
+            );
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -445,12 +505,40 @@ struct PrivateCapabilities {
     /// Ability to present contents to any screen. Only needed to work around broken platform configurations.
     can_present: bool,
     non_coherent_map_mask: wgt::BufferAddress,
+
+    /// True if this adapter advertises the [`robustBufferAccess`][vrba] feature.
+    ///
+    /// Note that Vulkan's `robustBufferAccess` is not sufficient to implement
+    /// `wgpu_hal`'s guarantee that shaders will not access buffer contents via
+    /// a given bindgroup binding outside that binding's [accessible
+    /// region][ar]. Enabling `robustBufferAccess` does ensure that
+    /// out-of-bounds reads and writes are not undefined behavior (that's good),
+    /// but still permits out-of-bounds reads to return data from anywhere
+    /// within the buffer, not just the accessible region.
+    ///
+    /// [ar]: ../struct.BufferBinding.html#accessible-region
+    /// [vrba]: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#features-robustBufferAccess
     robust_buffer_access: bool,
+
     robust_image_access: bool,
+
+    /// True if this adapter supports the [`VK_EXT_robustness2`] extension's
+    /// [`robustBufferAccess2`] feature.
+    ///
+    /// This is sufficient to implement `wgpu_hal`'s [required bounds-checking][ar] of
+    /// shader accesses to buffer contents. If this feature is not available,
+    /// this backend must have Naga inject bounds checks in the generated
+    /// SPIR-V.
+    ///
+    /// [`VK_EXT_robustness2`]: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_robustness2.html
+    /// [`robustBufferAccess2`]: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceRobustness2FeaturesEXT.html#features-robustBufferAccess2
+    /// [ar]: ../struct.BufferBinding.html#accessible-region
     robust_buffer_access2: bool,
+
     robust_image_access2: bool,
     zero_initialize_workgroup_memory: bool,
     image_format_list: bool,
+    maximum_samplers: u32,
 }
 
 bitflags::bitflags!(
@@ -547,7 +635,7 @@ struct DeviceShared {
     family_index: u32,
     queue_index: u32,
     raw_queue: vk::Queue,
-    handle_is_owned: bool,
+    drop_guard: Option<crate::DropGuard>,
     instance: Arc<InstanceShared>,
     physical_device: vk::PhysicalDevice,
     enabled_extensions: Vec<&'static CStr>,
@@ -558,9 +646,24 @@ struct DeviceShared {
     private_caps: PrivateCapabilities,
     workarounds: Workarounds,
     features: wgt::Features,
-    render_passes: Mutex<rustc_hash::FxHashMap<RenderPassKey, vk::RenderPass>>,
-    framebuffers: Mutex<rustc_hash::FxHashMap<FramebufferKey, vk::Framebuffer>>,
+    render_passes: Mutex<FxHashMap<RenderPassKey, vk::RenderPass>>,
+    framebuffers: Mutex<FxHashMap<FramebufferKey, vk::Framebuffer>>,
+    sampler_cache: Mutex<sampler::SamplerCache>,
     memory_allocations_counter: InternalCounter,
+}
+
+impl Drop for DeviceShared {
+    fn drop(&mut self) {
+        for &raw in self.render_passes.lock().values() {
+            unsafe { self.raw.destroy_render_pass(raw, None) };
+        }
+        for &raw in self.framebuffers.lock().values() {
+            unsafe { self.raw.destroy_framebuffer(raw, None) };
+        }
+        if self.drop_guard.is_none() {
+            unsafe { self.raw.destroy_device(None) };
+        }
+    }
 }
 
 pub struct Device {
@@ -572,7 +675,14 @@ pub struct Device {
     naga_options: naga::back::spv::Options<'static>,
     #[cfg(feature = "renderdoc")]
     render_doc: crate::auxil::renderdoc::RenderDoc,
-    counters: wgt::HalCounters,
+    counters: Arc<wgt::HalCounters>,
+}
+
+impl Drop for Device {
+    fn drop(&mut self) {
+        unsafe { self.mem_allocator.lock().cleanup(&*self.shared) };
+        unsafe { self.desc_allocator.lock().cleanup(&*self.shared) };
+    }
 }
 
 /// Semaphores for forcing queue submissions to run in order.
@@ -656,6 +766,13 @@ pub struct Queue {
     device: Arc<DeviceShared>,
     family_index: u32,
     relay_semaphores: Mutex<RelaySemaphores>,
+    signal_semaphores: Mutex<(Vec<vk::Semaphore>, Vec<u64>)>,
+}
+
+impl Drop for Queue {
+    fn drop(&mut self) {
+        unsafe { self.relay_semaphores.lock().destroy(&self.device.raw) };
+    }
 }
 
 #[derive(Debug)]
@@ -679,6 +796,7 @@ impl crate::DynAccelerationStructure for AccelerationStructure {}
 pub struct Texture {
     raw: vk::Image,
     drop_guard: Option<crate::DropGuard>,
+    external_memory: Option<vk::DeviceMemory>,
     block: Option<gpu_alloc::MemoryBlock<vk::DeviceMemory>>,
     usage: crate::TextureUses,
     format: wgt::TextureFormat,
@@ -719,6 +837,7 @@ impl TextureView {
 #[derive(Debug)]
 pub struct Sampler {
     raw: vk::Sampler,
+    create_info: vk::SamplerCreateInfo<'static>,
 }
 
 impl crate::DynSampler for Sampler {}
@@ -807,6 +926,30 @@ pub struct CommandEncoder {
     /// If set, the end of the next render/compute pass will write a timestamp at
     /// the given pool & location.
     end_of_pass_timer_query: Option<(vk::QueryPool, u32)>,
+
+    counters: Arc<wgt::HalCounters>,
+}
+
+impl Drop for CommandEncoder {
+    fn drop(&mut self) {
+        // SAFETY:
+        //
+        // VUID-vkDestroyCommandPool-commandPool-00041: wgpu_hal requires that a
+        // `CommandBuffer` must live until its execution is complete, and that a
+        // `CommandBuffer` must not outlive the `CommandEncoder` that built it.
+        // Thus, we know that none of our `CommandBuffers` are in the "pending"
+        // state.
+        //
+        // The other VUIDs are pretty obvious.
+        unsafe {
+            // `vkDestroyCommandPool` also frees any command buffers allocated
+            // from that pool, so there's no need to explicitly call
+            // `vkFreeCommandBuffers` on `cmd_encoder`'s `free` and `discarded`
+            // fields.
+            self.device.raw.destroy_command_pool(self.raw, None);
+        }
+        self.counters.command_encoders.sub(1);
+    }
 }
 
 impl CommandEncoder {
@@ -839,7 +982,7 @@ pub enum ShaderModule {
     Raw(vk::ShaderModule),
     Intermediate {
         naga_shader: crate::NagaShader,
-        runtime_checks: bool,
+        runtime_checks: wgt::ShaderRuntimeChecks,
     },
 }
 
@@ -1075,6 +1218,15 @@ impl crate::Queue for Queue {
             signal_values.push(!0);
         }
 
+        let mut guards = self.signal_semaphores.lock();
+        let (ref mut pending_signal_semaphores, ref mut pending_signal_semaphore_values) =
+            guards.deref_mut();
+        assert!(pending_signal_semaphores.len() == pending_signal_semaphore_values.len());
+        if !pending_signal_semaphores.is_empty() {
+            signal_semaphores.append(pending_signal_semaphores);
+            signal_values.append(pending_signal_semaphore_values);
+        }
+
         // In order for submissions to be strictly ordered, we encode a dependency between each submission
         // using a pair of semaphores. This adds a wait if it is needed, and signals the next semaphore.
         let semaphore_state = self.relay_semaphores.lock().advance(&self.device)?;
@@ -1158,6 +1310,23 @@ impl crate::Queue for Queue {
             .image_indices(&image_indices)
             .wait_semaphores(swapchain_semaphores.get_present_wait_semaphores());
 
+        let mut display_timing;
+        let present_times;
+        let vk_info = if let Some(present_time) = ssc.next_present_time.take() {
+            debug_assert!(
+                ssc.device
+                    .features
+                    .contains(wgt::Features::VULKAN_GOOGLE_DISPLAY_TIMING),
+                "`next_present_time` should only be set if `VULKAN_GOOGLE_DISPLAY_TIMING` is enabled"
+            );
+            present_times = [present_time];
+            display_timing = vk::PresentTimesInfoGOOGLE::default().times(&present_times);
+            // SAFETY: We know that VK_GOOGLE_display_timing is present because of the safety contract on `next_present_time`.
+            vk_info.push_next(&mut display_timing)
+        } else {
+            vk_info
+        };
+
         let suboptimal = {
             profiling::scope!("vkQueuePresentKHR");
             unsafe { self.swapchain_fn.queue_present(self.raw, &vk_info) }.map_err(|error| {
@@ -1183,6 +1352,19 @@ impl crate::Queue for Queue {
 
     unsafe fn get_timestamp_period(&self) -> f32 {
         self.device.timestamp_period
+    }
+}
+
+impl Queue {
+    pub fn raw_device(&self) -> &ash::Device {
+        &self.device.raw
+    }
+
+    pub fn add_signal_semaphore(&self, semaphore: vk::Semaphore, semaphore_value: Option<u64>) {
+        let mut guards = self.signal_semaphores.lock();
+        let (ref mut semaphores, ref mut semaphore_values) = guards.deref_mut();
+        semaphores.push(semaphore);
+        semaphore_values.push(semaphore_value.unwrap_or(!0));
     }
 }
 
@@ -1296,6 +1478,11 @@ fn get_lost_err() -> crate::DeviceError {
     crate::DeviceError::Lost
 }
 
-fn hal_usage_error<T: fmt::Display>(txt: T) -> ! {
-    panic!("wgpu-hal invariant was violated (usage error): {txt}")
+#[derive(Clone)]
+#[repr(C)]
+struct RawTlasInstance {
+    transform: [f32; 12],
+    custom_index_and_mask: u32,
+    shader_binding_table_record_offset_and_flags: u32,
+    acceleration_structure_reference: u64,
 }

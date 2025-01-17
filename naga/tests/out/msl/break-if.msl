@@ -15,6 +15,8 @@ void breakIfEmpty(
             }
         }
         loop_init = false;
+#define LOOP_IS_BOUNDED { volatile bool unpredictable_break_from_loop = false; if (unpredictable_break_from_loop) break; }
+        LOOP_IS_BOUNDED
     }
     return;
 }
@@ -36,6 +38,7 @@ void breakIfEmptyBody(
             }
         }
         loop_init_1 = false;
+        LOOP_IS_BOUNDED
     }
     return;
 }
@@ -57,6 +60,7 @@ void breakIf(
         d = a_1;
         bool _e2 = d;
         e = a_1 != _e2;
+        LOOP_IS_BOUNDED
     }
     return;
 }
@@ -75,6 +79,7 @@ void breakIfSeparateVariable(
         loop_init_3 = false;
         uint _e3 = counter;
         counter = _e3 + 1u;
+        LOOP_IS_BOUNDED
     }
     return;
 }

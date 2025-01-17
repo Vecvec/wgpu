@@ -1,10 +1,9 @@
-use std::{borrow::Cow, str::FromStr};
+use std::str::FromStr;
 use wgpu::util::DeviceExt;
 
 // Indicates a u32 overflow in an intermediate Collatz value
 const OVERFLOW: u32 = 0xffffffff;
 
-#[cfg_attr(test, allow(dead_code))]
 async fn run() {
     let numbers = if std::env::args().len() <= 2 {
         let default = vec![1, 2, 3, 4];
@@ -32,7 +31,6 @@ async fn run() {
     log::info!("Steps: [{}]", disp_steps.join(", "));
 }
 
-#[cfg_attr(test, allow(dead_code))]
 async fn execute_gpu(numbers: &[u32]) -> Option<Vec<u32>> {
     // Instantiates instance of WebGPU
     let instance = wgpu::Instance::default();
@@ -66,13 +64,10 @@ async fn execute_gpu_inner(
     numbers: &[u32],
 ) -> Option<Vec<u32>> {
     // Loads the shader from WGSL
-    let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shader.wgsl"))),
-    });
+    let cs_module = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
     // Gets the size in bytes of the buffer.
-    let size = std::mem::size_of_val(numbers) as wgpu::BufferAddress;
+    let size = size_of_val(numbers) as wgpu::BufferAddress;
 
     // Instantiates buffer without data.
     // `usage` of buffer specifies how it can be used:

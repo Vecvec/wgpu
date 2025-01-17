@@ -122,17 +122,12 @@ impl WgpuContext {
             .await
             .unwrap();
 
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!(
-                "shader.wgsl"
-            ))),
-        });
+        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
         // (2)
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: std::mem::size_of::<AppState>() as u64,
+            size: size_of::<AppState>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -327,7 +322,11 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                                     });
                                 render_pass.set_pipeline(&wgpu_context_ref.pipeline);
                                 // (9)
-                                render_pass.set_bind_group(0, &wgpu_context_ref.bind_group, &[]);
+                                render_pass.set_bind_group(
+                                    0,
+                                    Some(&wgpu_context_ref.bind_group),
+                                    &[],
+                                );
                                 render_pass.draw(0..3, 0..1);
                             }
                             wgpu_context_ref.queue.submit(Some(encoder.finish()));
@@ -344,7 +343,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
 pub fn main() {
     let event_loop = EventLoop::new().unwrap();
-    #[allow(unused_mut)]
+    #[cfg_attr(
+        not(target_arch = "wasm32"),
+        expect(unused_mut, reason = "`wasm32` re-assigns to specify canvas")
+    )]
     let mut builder = winit::window::WindowBuilder::new()
         .with_title("Remember: Use U/D to change sample count!")
         .with_inner_size(winit::dpi::LogicalSize::new(900, 900));

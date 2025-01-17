@@ -1,6 +1,7 @@
-use std::{sync::Arc, thread};
+use std::sync::Arc;
 
-use crate::context::ObjectId;
+use parking_lot::Mutex;
+
 use crate::*;
 
 /// Handle to a command buffer on the GPU.
@@ -10,22 +11,11 @@ use crate::*;
 /// a [`CommandEncoder`] and then calling [`CommandEncoder::finish`].
 ///
 /// Corresponds to [WebGPU `GPUCommandBuffer`](https://gpuweb.github.io/gpuweb/#command-buffer).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommandBuffer {
-    pub(crate) context: Arc<C>,
-    pub(crate) id: Option<ObjectId>,
-    pub(crate) data: Option<Box<Data>>,
+    pub(crate) inner: Arc<Mutex<Option<dispatch::DispatchCommandBuffer>>>,
 }
 #[cfg(send_sync)]
 static_assertions::assert_impl_all!(CommandBuffer: Send, Sync);
 
-impl Drop for CommandBuffer {
-    fn drop(&mut self) {
-        if !thread::panicking() {
-            if let Some(id) = self.id.take() {
-                self.context
-                    .command_buffer_drop(&id, self.data.take().unwrap().as_ref());
-            }
-        }
-    }
-}
+crate::cmp::impl_eq_ord_hash_arc_address!(CommandBuffer => .inner);

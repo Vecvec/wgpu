@@ -3,7 +3,7 @@ name = "wgpu"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
-description = "Rusty WebGPU API wrapper"
+description = "Cross-platform, safe, pure-rust graphics API"
 homepage.workspace = true
 repository.workspace = true
 keywords.workspace = true
@@ -117,6 +117,18 @@ fragile-send-sync-non-atomic-wasm = [
     "wgt/fragile-send-sync-non-atomic-wasm",
 ]
 
+
+#! ### External libraries
+# --------------------------------------------------------------------
+#! The following features facilitate integration with third-party supporting libraries.
+
+## Enables statically linking DXC.
+## Normally, to use the modern DXC shader compiler with WGPU, the final application
+## must be shipped alongside `dxcompiler.dll` and `dxil.dll` (which can be downloaded from Microsoft's GitHub).
+## This feature statically links a version of DXC so that no external binaries are required
+## to compile DX12 shaders.
+static-dxc = ["hal/static-dxc"]
+
 # wgpu-core is always available as an optional dependency, "wgc".
 # Whenever wgpu-core is selected, we want raw window handle support.
 [dependencies.wgc]
@@ -130,9 +142,15 @@ features = ["raw-window-handle"]
 workspace = true
 features = ["raw-window-handle"]
 
+# If we are not targeting WebGL, enable indirect-validation.
+# WebGL doesn't support indirect execution so this is not needed.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.wgc]
+workspace = true
+features = ["indirect-validation"]
+
 # Enable `wgc` by default on macOS and iOS to allow the `metal` crate feature to
 # enable the Metal backend while being no-op on other targets.
-[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies.wgc]
+[target.'cfg(target_vendor = "apple")'.dependencies.wgc]
 workspace = true
 
 # We want the wgpu-core Direct3D backend and OpenGL (via WGL) on Windows.
@@ -141,12 +159,12 @@ workspace = true
 features = ["gles"]
 
 # We want the wgpu-core Vulkan backend on Unix (but not emscripten, macOS, iOS) and Windows.
-[target.'cfg(any(windows, all(unix, not(target_os = "emscripten"), not(target_os = "ios"), not(target_os = "macos"))))'.dependencies.wgc]
+[target.'cfg(any(windows, all(unix, not(target_os = "emscripten"), not(target_vendor = "apple"))))'.dependencies.wgc]
 workspace = true
 features = ["vulkan"]
 
 # We want the wgpu-core GLES backend on Unix (but not macOS, iOS).
-[target.'cfg(all(unix, not(target_os = "ios"), not(target_os = "macos")))'.dependencies.wgc]
+[target.'cfg(all(unix, not(target_vendor = "apple")))'.dependencies.wgc]
 workspace = true
 features = ["gles"]
 
@@ -157,15 +175,11 @@ workspace = true
 [target.'cfg(any(not(target_arch = "wasm32"), target_os = "emscripten"))'.dependencies]
 hal = { workspace = true }
 
-[target.'cfg(all(not(target_arch = "wasm32"), unix, not(target_os = "ios"), not(target_os = "macos")))'.dependencies]
+[target.'cfg(all(not(target_arch = "wasm32"), unix, not(target_vendor = "apple")))'.dependencies]
 hal = { workspace = true, features = ["renderdoc"] }
 
 [target.'cfg(windows)'.dependencies]
-hal = { workspace = true, features = [
-    "dxc_shader_compiler",
-    "renderdoc",
-    "windows_rs",
-] }
+hal = { workspace = true, features = ["renderdoc"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.hal]
 workspace = true
@@ -173,12 +187,13 @@ optional = true
 
 [dependencies]
 arrayvec.workspace = true
+bitflags.workspace = true
 document-features.workspace = true
 log.workspace = true
 parking_lot.workspace = true
 profiling.workspace = true
 raw-window-handle = { workspace = true, features = ["std"] }
-serde = { workspace = true, features = ["derive"], optional = true }
+serde = { workspace = true, features = ["default", "derive"], optional = true }
 smallvec.workspace = true
 static_assertions.workspace = true
 
@@ -196,6 +211,7 @@ features = ["wgsl-in"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { workspace = true, features = [
+    "default",
     "Document",
     "Navigator",
     "Node",
@@ -212,6 +228,6 @@ web-sys = { workspace = true, features = [
     "EventTarget",
 ] }
 wasm-bindgen.workspace = true
-js-sys.workspace = true
+js-sys = { workspace = true, features = ["default"] }
 wasm-bindgen-futures.workspace = true
 parking_lot.workspace = true

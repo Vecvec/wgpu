@@ -11,7 +11,7 @@ on:
 env:
   # We need to use nightly for various features
   # when building docs.rs style docs.
-  NIGHTLY_VERSION: nightly-2023-12-17
+  NIGHTLY_VERSION: nightly-2025-01-09
 
   CARGO_INCREMENTAL: false
   CARGO_TERM_COLOR: always
@@ -41,7 +41,7 @@ jobs:
         if: ${{ failure() }}
 
       - name: Deploy the docs
-        uses: JamesIves/github-pages-deploy-action@v4.6.3
+        uses: JamesIves/github-pages-deploy-action@v4.7.2
         if: github.ref == 'refs/heads/trunk'
         with:
           token: ${{ secrets.WEB_DEPLOY }}

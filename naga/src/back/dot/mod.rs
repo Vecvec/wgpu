@@ -254,6 +254,21 @@ impl StatementGraph {
                     }
                     "Atomic"
                 }
+                S::ImageAtomic {
+                    image,
+                    coordinate,
+                    array_index,
+                    fun: _,
+                    value,
+                } => {
+                    self.dependencies.push((id, image, "image"));
+                    self.dependencies.push((id, coordinate, "coordinate"));
+                    if let Some(expr) = array_index {
+                        self.dependencies.push((id, expr, "array_index"));
+                    }
+                    self.dependencies.push((id, value, "value"));
+                    "ImageAtomic"
+                }
                 S::WorkGroupUniformLoad { pointer, result } => {
                     self.emits.push((id, result));
                     self.dependencies.push((id, pointer, "pointer"));
@@ -699,7 +714,7 @@ fn write_function_expressions(
             E::RayQueryGetIntersection { query, committed } => {
                 edges.insert("", query);
                 let ty = if committed { "Committed" } else { "Candidate" };
-                (format!("rayQueryGet{}Intersection", ty).into(), 4)
+                (format!("rayQueryGet{ty}Intersection").into(), 4)
             }
             E::ReportIntersectionResult => unimplemented!("no raytracing support"),
             E::SubgroupBallotResult => ("SubgroupBallotResult".into(), 4),

@@ -346,11 +346,11 @@ impl crate::Module {
                     },
                 }
             }
-            crate::PredeclaredType::ModfResult { size, width } => {
+            crate::PredeclaredType::ModfResult { size, scalar } => {
                 let float_ty = self.types.insert(
                     crate::Type {
                         name: None,
-                        inner: crate::TypeInner::Scalar(crate::Scalar::float(width)),
+                        inner: crate::TypeInner::Scalar(scalar),
                     },
                     Span::UNDEFINED,
                 );
@@ -359,23 +359,20 @@ impl crate::Module {
                     let vec_ty = self.types.insert(
                         crate::Type {
                             name: None,
-                            inner: crate::TypeInner::Vector {
-                                size,
-                                scalar: crate::Scalar::float(width),
-                            },
+                            inner: crate::TypeInner::Vector { size, scalar },
                         },
                         Span::UNDEFINED,
                     );
-                    (vec_ty, size as u32 * width as u32)
+                    (vec_ty, size as u32 * scalar.width as u32)
                 } else {
-                    (float_ty, width as u32)
+                    (float_ty, scalar.width as u32)
                 };
 
                 let mut type_name = "__modf_result_".to_string();
                 if let Some(size) = size {
                     let _ = write!(type_name, "vec{}_", size as u8);
                 }
-                let _ = write!(type_name, "f{}", width * 8);
+                let _ = write!(type_name, "f{}", scalar.width * 8);
 
                 crate::Type {
                     name: Some(type_name),
@@ -398,11 +395,11 @@ impl crate::Module {
                     },
                 }
             }
-            crate::PredeclaredType::FrexpResult { size, width } => {
+            crate::PredeclaredType::FrexpResult { size, scalar } => {
                 let float_ty = self.types.insert(
                     crate::Type {
                         name: None,
-                        inner: crate::TypeInner::Scalar(crate::Scalar::float(width)),
+                        inner: crate::TypeInner::Scalar(scalar),
                     },
                     Span::UNDEFINED,
                 );
@@ -412,7 +409,7 @@ impl crate::Module {
                         name: None,
                         inner: crate::TypeInner::Scalar(crate::Scalar {
                             kind: crate::ScalarKind::Sint,
-                            width,
+                            width: scalar.width,
                         }),
                     },
                     Span::UNDEFINED,
@@ -422,10 +419,7 @@ impl crate::Module {
                     let vec_float_ty = self.types.insert(
                         crate::Type {
                             name: None,
-                            inner: crate::TypeInner::Vector {
-                                size,
-                                scalar: crate::Scalar::float(width),
-                            },
+                            inner: crate::TypeInner::Vector { size, scalar },
                         },
                         Span::UNDEFINED,
                     );
@@ -436,22 +430,22 @@ impl crate::Module {
                                 size,
                                 scalar: crate::Scalar {
                                     kind: crate::ScalarKind::Sint,
-                                    width,
+                                    width: scalar.width,
                                 },
                             },
                         },
                         Span::UNDEFINED,
                     );
-                    (vec_float_ty, vec_int_ty, size as u32 * width as u32)
+                    (vec_float_ty, vec_int_ty, size as u32 * scalar.width as u32)
                 } else {
-                    (float_ty, int_ty, width as u32)
+                    (float_ty, int_ty, scalar.width as u32)
                 };
 
                 let mut type_name = "__frexp_result_".to_string();
                 if let Some(size) = size {
                     let _ = write!(type_name, "vec{}_", size as u8);
                 }
-                let _ = write!(type_name, "f{}", width * 8);
+                let _ = write!(type_name, "f{}", scalar.width * 8);
 
                 crate::Type {
                     name: Some(type_name),

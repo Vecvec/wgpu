@@ -51,8 +51,8 @@
 //!   must use [`CommandEncoder::transition_buffers`] between those two
 //!   operations.
 //!
-//! - Pipeline layouts are *explicitly specified* when setting bind
-//!   group. Incompatible layouts disturb groups bound at higher indices.
+//! - Pipeline layouts are *explicitly specified* when setting bind groups.
+//!   Incompatible layouts disturb groups bound at higher indices.
 //!
 //! - The API *accepts collections as iterators*, to avoid forcing the user to
 //!   store data in particular containers. The implementation doesn't guarantee
@@ -82,12 +82,12 @@
 //!
 //! - Metal on macOS, using the [`metal`] crate's bindings.
 //!
-//! - Direct3D 12 on Windows, using the [`d3d12`] crate's bindings.
+//! - Direct3D 12 on Windows, using the [`windows`] crate's bindings.
 //!
 //! [`ash`]: https://crates.io/crates/ash
 //! [MoltenVK]: https://github.com/KhronosGroup/MoltenVK
 //! [`metal`]: https://crates.io/crates/metal
-//! [`d3d12`]: https://crates.io/crates/d3d12
+//! [`windows`]: https://crates.io/crates/windows
 //!
 //! ## Secondary backends
 //!
@@ -303,8 +303,39 @@ pub type MemoryRange = Range<wgt::BufferAddress>;
 pub type FenceValue = u64;
 pub type AtomicFenceValue = std::sync::atomic::AtomicU64;
 
-/// Drop guard to signal wgpu-hal is no longer using an externally created object.
-pub type DropGuard = Box<dyn std::any::Any + Send + Sync>;
+/// A callback to signal that wgpu is no longer using a resource.
+#[cfg(any(gles, vulkan))]
+pub type DropCallback = Box<dyn FnOnce() + Send + Sync + 'static>;
+
+#[cfg(any(gles, vulkan))]
+pub struct DropGuard {
+    callback: Option<DropCallback>,
+}
+
+#[cfg(all(any(gles, vulkan), any(native, Emscripten)))]
+impl DropGuard {
+    fn from_option(callback: Option<DropCallback>) -> Option<Self> {
+        callback.map(|callback| Self {
+            callback: Some(callback),
+        })
+    }
+}
+
+#[cfg(any(gles, vulkan))]
+impl Drop for DropGuard {
+    fn drop(&mut self) {
+        if let Some(cb) = self.callback.take() {
+            (cb)();
+        }
+    }
+}
+
+#[cfg(any(gles, vulkan))]
+impl fmt::Debug for DropGuard {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DropGuard").finish()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum DeviceError {
@@ -316,6 +347,18 @@ pub enum DeviceError {
     ResourceCreationFailed,
     #[error("Unexpected error variant (driver implementation is at fault)")]
     Unexpected,
+}
+
+#[allow(dead_code)] // may be unused on some platforms
+#[cold]
+fn hal_usage_error<T: fmt::Display>(txt: T) -> ! {
+    panic!("wgpu-hal invariant was violated (usage error): {txt}")
+}
+
+#[allow(dead_code)] // may be unused on some platforms
+#[cold]
+fn hal_internal_error<T: fmt::Display>(txt: T) -> ! {
+    panic!("wgpu-hal ran into a preventable internal error: {txt}")
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
@@ -633,7 +676,7 @@ pub trait Adapter: WasmNotSendSync {
 /// 1)  Free resources with methods like [`Device::destroy_texture`] or
 ///     [`Device::destroy_shader_module`].
 ///
-/// 1)  Shut down the device by calling [`Device::exit`].
+/// 1)  Drop the device.
 ///
 /// [`vkDevice`]: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkDevice
 /// [`ID3D12Device`]: https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nn-d3d12-id3d12device
@@ -663,8 +706,6 @@ pub trait Adapter: WasmNotSendSync {
 pub trait Device: WasmNotSendSync {
     type A: Api;
 
-    /// Exit connection to this logical device.
-    unsafe fn exit(self, queue: <Self::A as Api>::Queue);
     /// Creates a new buffer.
     ///
     /// The initial usage is `BufferUses::empty()`.
@@ -683,6 +724,9 @@ pub trait Device: WasmNotSendSync {
     ///
     /// - The given `buffer` must not currently be mapped.
     unsafe fn destroy_buffer(&self, buffer: <Self::A as Api>::Buffer);
+
+    /// A hook for when a wgpu-core buffer is created from a raw wgpu-hal buffer.
+    unsafe fn add_raw_buffer(&self, buffer: &<Self::A as Api>::Buffer);
 
     /// Return a pointer to CPU memory mapping the contents of `buffer`.
     ///
@@ -775,6 +819,10 @@ pub trait Device: WasmNotSendSync {
         desc: &TextureDescriptor,
     ) -> Result<<Self::A as Api>::Texture, DeviceError>;
     unsafe fn destroy_texture(&self, texture: <Self::A as Api>::Texture);
+
+    /// A hook for when a wgpu-core texture is created from a raw wgpu-hal texture.
+    unsafe fn add_raw_texture(&self, texture: &<Self::A as Api>::Texture);
+
     unsafe fn create_texture_view(
         &self,
         texture: &<Self::A as Api>::Texture,
@@ -794,7 +842,6 @@ pub trait Device: WasmNotSendSync {
         &self,
         desc: &CommandEncoderDescriptor<<Self::A as Api>::Queue>,
     ) -> Result<<Self::A as Api>::CommandEncoder, DeviceError>;
-    unsafe fn destroy_command_encoder(&self, pool: <Self::A as Api>::CommandEncoder);
 
     /// Creates a bind group layout.
     unsafe fn create_bind_group_layout(
@@ -923,6 +970,7 @@ pub trait Device: WasmNotSendSync {
         &self,
         acceleration_structure: <Self::A as Api>::AccelerationStructure,
     );
+    fn tlas_instance_to_bytes(&self, instance: TlasInstance) -> Vec<u8>;
 
     fn get_internal_counters(&self) -> wgt::HalCounters;
 
@@ -1061,8 +1109,6 @@ pub trait Queue: WasmNotSendSync {
 /// - A `CommandBuffer` must not outlive the `CommandEncoder` that
 ///   built it.
 ///
-/// - A `CommandEncoder` must not outlive its `Device`.
-///
 /// It is the user's responsibility to meet this requirements. This
 /// allows `CommandEncoder` implementations to keep their state
 /// tracking to a minimum.
@@ -1157,7 +1203,7 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
     #[cfg(webgl)]
     unsafe fn copy_external_image_to_texture<T>(
         &mut self,
-        src: &wgt::ImageCopyExternalImage,
+        src: &wgt::CopyExternalImageSourceInfo,
         dst: &<Self::A as Api>::Texture,
         dst_premultiplication: bool,
         regions: T,
@@ -1203,8 +1249,40 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
 
     // pass common
 
-    /// Sets the bind group at `index` to `group`, assuming the layout
-    /// of all the preceding groups to be taken from `layout`.
+    /// Sets the bind group at `index` to `group`.
+    ///
+    /// If this is not the first call to `set_bind_group` within the current
+    /// render or compute pass:
+    ///
+    /// - If `layout` contains `n` bind group layouts, then any previously set
+    ///   bind groups at indices `n` or higher are cleared.
+    ///
+    /// - If the first `m` bind group layouts of `layout` are equal to those of
+    ///   the previously passed layout, but no more, then any previously set
+    ///   bind groups at indices `m` or higher are cleared.
+    ///
+    /// It follows from the above that passing the same layout as before doesn't
+    /// clear any bind groups.
+    ///
+    /// # Safety
+    ///
+    /// - This [`CommandEncoder`] must be within a render or compute pass.
+    ///
+    /// - `index` must be the valid index of some bind group layout in `layout`.
+    ///   Call this the "relevant bind group layout".
+    ///
+    /// - The layout of `group` must be equal to the relevant bind group layout.
+    ///
+    /// - The length of `dynamic_offsets` must match the number of buffer
+    ///   bindings [with dynamic offsets][hdo] in the relevant bind group
+    ///   layout.
+    ///
+    /// - If those buffer bindings are ordered by increasing [`binding` number]
+    ///   and paired with elements from `dynamic_offsets`, then each offset must
+    ///   be a valid offset for the binding's corresponding buffer in `group`.
+    ///
+    /// [hdo]: wgt::BindingType::Buffer::has_dynamic_offset
+    /// [`binding` number]: wgt::BindGroupLayoutEntry::binding
     unsafe fn set_bind_group(
         &mut self,
         layout: &<Self::A as Api>::PipelineLayout,
@@ -1256,11 +1334,43 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
 
     // render passes
 
-    // Begins a render pass, clears all active bindings.
+    /// Begin a new render pass, clearing all active bindings.
+    ///
+    /// This clears any bindings established by the following calls:
+    ///
+    /// - [`set_bind_group`](CommandEncoder::set_bind_group)
+    /// - [`set_push_constants`](CommandEncoder::set_push_constants)
+    /// - [`begin_query`](CommandEncoder::begin_query)
+    /// - [`set_render_pipeline`](CommandEncoder::set_render_pipeline)
+    /// - [`set_index_buffer`](CommandEncoder::set_index_buffer)
+    /// - [`set_vertex_buffer`](CommandEncoder::set_vertex_buffer)
+    ///
+    /// # Safety
+    ///
+    /// - All prior calls to [`begin_render_pass`] on this [`CommandEncoder`] must have been followed
+    ///   by a call to [`end_render_pass`].
+    ///
+    /// - All prior calls to [`begin_compute_pass`] on this [`CommandEncoder`] must have been followed
+    ///   by a call to [`end_compute_pass`].
+    ///
+    /// [`begin_render_pass`]: CommandEncoder::begin_render_pass
+    /// [`begin_compute_pass`]: CommandEncoder::begin_compute_pass
+    /// [`end_render_pass`]: CommandEncoder::end_render_pass
+    /// [`end_compute_pass`]: CommandEncoder::end_compute_pass
     unsafe fn begin_render_pass(
         &mut self,
         desc: &RenderPassDescriptor<<Self::A as Api>::QuerySet, <Self::A as Api>::TextureView>,
     );
+
+    /// End the current render pass.
+    ///
+    /// # Safety
+    ///
+    /// - There must have been a prior call to [`begin_render_pass`] on this [`CommandEncoder`]
+    ///   that has not been followed by a call to [`end_render_pass`].
+    ///
+    /// [`begin_render_pass`]: CommandEncoder::begin_render_pass
+    /// [`end_render_pass`]: CommandEncoder::end_render_pass
     unsafe fn end_render_pass(&mut self);
 
     unsafe fn set_render_pipeline(&mut self, pipeline: &<Self::A as Api>::RenderPipeline);
@@ -1326,11 +1436,41 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
 
     // compute passes
 
-    // Begins a compute pass, clears all active bindings.
+    /// Begin a new compute pass, clearing all active bindings.
+    ///
+    /// This clears any bindings established by the following calls:
+    ///
+    /// - [`set_bind_group`](CommandEncoder::set_bind_group)
+    /// - [`set_push_constants`](CommandEncoder::set_push_constants)
+    /// - [`begin_query`](CommandEncoder::begin_query)
+    /// - [`set_compute_pipeline`](CommandEncoder::set_compute_pipeline)
+    ///
+    /// # Safety
+    ///
+    /// - All prior calls to [`begin_render_pass`] on this [`CommandEncoder`] must have been followed
+    ///   by a call to [`end_render_pass`].
+    ///
+    /// - All prior calls to [`begin_compute_pass`] on this [`CommandEncoder`] must have been followed
+    ///   by a call to [`end_compute_pass`].
+    ///
+    /// [`begin_render_pass`]: CommandEncoder::begin_render_pass
+    /// [`begin_compute_pass`]: CommandEncoder::begin_compute_pass
+    /// [`end_render_pass`]: CommandEncoder::end_render_pass
+    /// [`end_compute_pass`]: CommandEncoder::end_compute_pass
     unsafe fn begin_compute_pass(
         &mut self,
         desc: &ComputePassDescriptor<<Self::A as Api>::QuerySet>,
     );
+
+    /// End the current compute pass.
+    ///
+    /// # Safety
+    ///
+    /// - There must have been a prior call to [`begin_compute_pass`] on this [`CommandEncoder`]
+    ///   that has not been followed by a call to [`end_compute_pass`].
+    ///
+    /// [`begin_compute_pass`]: CommandEncoder::begin_compute_pass
+    /// [`end_compute_pass`]: CommandEncoder::end_compute_pass
     unsafe fn end_compute_pass(&mut self);
 
     unsafe fn set_compute_pipeline(&mut self, pipeline: &<Self::A as Api>::ComputePipeline);
@@ -1373,10 +1513,15 @@ bitflags!(
     /// Pipeline layout creation flags.
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub struct PipelineLayoutFlags: u32 {
-        /// Include support for `first_vertex` / `first_instance` drawing.
+        /// D3D12: Add support for `first_vertex` and `first_instance` builtins
+        /// via push constants for direct execution.
         const FIRST_VERTEX_INSTANCE = 1 << 0;
-        /// Include support for num work groups builtin.
+        /// D3D12: Add support for `num_workgroups` builtins via push constants
+        /// for direct execution.
         const NUM_WORK_GROUPS = 1 << 1;
+        /// D3D12: Add support for the builtins that the other flags enable for
+        /// indirect execution.
+        const INDIRECT_BUILTIN_UPDATE = 1 << 2;
     }
 );
 
@@ -1400,36 +1545,38 @@ bitflags!(
         /// Format can be sampled with a min/max reduction sampler.
         const SAMPLED_MINMAX = 1 << 2;
 
+        /// Format can be used as storage with read-only access.
+        const STORAGE_READ_ONLY = 1 << 3;
         /// Format can be used as storage with write-only access.
-        const STORAGE = 1 << 3;
-        /// Format can be used as storage with read and read/write access.
-        const STORAGE_READ_WRITE = 1 << 4;
+        const STORAGE_WRITE_ONLY = 1 << 4;
+        /// Format can be used as storage with both read and write access.
+        const STORAGE_READ_WRITE = 1 << 5;
         /// Format can be used as storage with atomics.
-        const STORAGE_ATOMIC = 1 << 5;
+        const STORAGE_ATOMIC = 1 << 6;
 
         /// Format can be used as color and input attachment.
-        const COLOR_ATTACHMENT = 1 << 6;
+        const COLOR_ATTACHMENT = 1 << 7;
         /// Format can be used as color (with blending) and input attachment.
-        const COLOR_ATTACHMENT_BLEND = 1 << 7;
+        const COLOR_ATTACHMENT_BLEND = 1 << 8;
         /// Format can be used as depth-stencil and input attachment.
-        const DEPTH_STENCIL_ATTACHMENT = 1 << 8;
+        const DEPTH_STENCIL_ATTACHMENT = 1 << 9;
 
         /// Format can be multisampled by x2.
-        const MULTISAMPLE_X2   = 1 << 9;
+        const MULTISAMPLE_X2   = 1 << 10;
         /// Format can be multisampled by x4.
-        const MULTISAMPLE_X4   = 1 << 10;
+        const MULTISAMPLE_X4   = 1 << 11;
         /// Format can be multisampled by x8.
-        const MULTISAMPLE_X8   = 1 << 11;
+        const MULTISAMPLE_X8   = 1 << 12;
         /// Format can be multisampled by x16.
-        const MULTISAMPLE_X16  = 1 << 12;
+        const MULTISAMPLE_X16  = 1 << 13;
 
         /// Format can be used for render pass resolve targets.
-        const MULTISAMPLE_RESOLVE = 1 << 13;
+        const MULTISAMPLE_RESOLVE = 1 << 14;
 
         /// Format can be copied from.
-        const COPY_SRC = 1 << 14;
+        const COPY_SRC = 1 << 15;
         /// Format can be copied to.
-        const COPY_DST = 1 << 15;
+        const COPY_DST = 1 << 16;
     }
 );
 
@@ -1463,7 +1610,7 @@ impl FormatAspects {
 
     /// Returns `true` if only one flag is set
     pub fn is_one(&self) -> bool {
-        self.bits().count_ones() == 1
+        self.bits().is_power_of_two()
     }
 
     pub fn map(&self) -> wgt::TextureAspect {
@@ -1532,8 +1679,8 @@ bitflags::bitflags! {
         /// A uniform buffer bound in a bind group.
         const UNIFORM = 1 << 6;
         /// A read-only storage buffer used in a bind group.
-        const STORAGE_READ = 1 << 7;
-        /// A read-write or write-only buffer used in a bind group.
+        const STORAGE_READ_ONLY = 1 << 7;
+        /// A read-write buffer used in a bind group.
         const STORAGE_READ_WRITE = 1 << 8;
         /// The indirect or count buffer in a indirect draw or dispatch.
         const INDIRECT = 1 << 9;
@@ -1545,7 +1692,7 @@ bitflags::bitflags! {
         /// The combination of states that a buffer may be in _at the same time_.
         const INCLUSIVE = Self::MAP_READ.bits() | Self::COPY_SRC.bits() |
             Self::INDEX.bits() | Self::VERTEX.bits() | Self::UNIFORM.bits() |
-            Self::STORAGE_READ.bits() | Self::INDIRECT.bits() | Self::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT.bits() | Self::TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT.bits();
+            Self::STORAGE_READ_ONLY.bits() | Self::INDIRECT.bits() | Self::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT.bits() | Self::TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT.bits();
         /// The combination of states that a buffer must exclusively be in.
         const EXCLUSIVE = Self::MAP_WRITE.bits() | Self::COPY_DST.bits() | Self::STORAGE_READ_WRITE.bits() | Self::ACCELERATION_STRUCTURE_SCRATCH.bits();
         /// The combination of all usages that the are guaranteed to be be ordered by the hardware.
@@ -1575,24 +1722,28 @@ bitflags::bitflags! {
         const DEPTH_STENCIL_READ = 1 << 6;
         /// Read-write depth stencil usage
         const DEPTH_STENCIL_WRITE = 1 << 7;
-        /// Read-only storage buffer usage. Corresponds to a UAV in d3d, so is exclusive, despite being read only.
-        const STORAGE_READ = 1 << 8;
-        /// Read-write or write-only storage buffer usage.
-        const STORAGE_READ_WRITE = 1 << 9;
+        /// Read-only storage texture usage. Corresponds to a UAV in d3d, so is exclusive, despite being read only.
+        const STORAGE_READ_ONLY = 1 << 8;
+        /// Write-only storage texture usage.
+        const STORAGE_WRITE_ONLY = 1 << 9;
+        /// Read-write storage texture usage.
+        const STORAGE_READ_WRITE = 1 << 10;
+        /// Image atomic enabled storage
+        const STORAGE_ATOMIC = 1 << 11;
         /// The combination of states that a texture may be in _at the same time_.
         const INCLUSIVE = Self::COPY_SRC.bits() | Self::RESOURCE.bits() | Self::DEPTH_STENCIL_READ.bits();
         /// The combination of states that a texture must exclusively be in.
-        const EXCLUSIVE = Self::COPY_DST.bits() | Self::COLOR_TARGET.bits() | Self::DEPTH_STENCIL_WRITE.bits() | Self::STORAGE_READ.bits() | Self::STORAGE_READ_WRITE.bits() | Self::PRESENT.bits();
+        const EXCLUSIVE = Self::COPY_DST.bits() | Self::COLOR_TARGET.bits() | Self::DEPTH_STENCIL_WRITE.bits() | Self::STORAGE_READ_ONLY.bits() | Self::STORAGE_WRITE_ONLY.bits() | Self::STORAGE_READ_WRITE.bits() | Self::STORAGE_ATOMIC.bits() | Self::PRESENT.bits();
         /// The combination of all usages that the are guaranteed to be be ordered by the hardware.
         /// If a usage is ordered, then if the texture state doesn't change between draw calls, there
         /// are no barriers needed for synchronization.
-        const ORDERED = Self::INCLUSIVE.bits() | Self::COLOR_TARGET.bits() | Self::DEPTH_STENCIL_WRITE.bits() | Self::STORAGE_READ.bits();
+        const ORDERED = Self::INCLUSIVE.bits() | Self::COLOR_TARGET.bits() | Self::DEPTH_STENCIL_WRITE.bits() | Self::STORAGE_READ_ONLY.bits();
 
         /// Flag used by the wgpu-core texture tracker to say a texture is in different states for every sub-resource
-        const COMPLEX = 1 << 10;
+        const COMPLEX = 1 << 12;
         /// Flag used by the wgpu-core texture tracker to say that the tracker does not know the state of the sub-resource.
         /// This is different from UNINITIALIZED as that says the tracker does know, but the texture has not been initialized.
-        const UNKNOWN = 1 << 11;
+        const UNKNOWN = 1 << 13;
     }
 }
 
@@ -1608,9 +1759,33 @@ pub struct InstanceDescriptor<'a> {
 pub struct Alignments {
     /// The alignment of the start of the buffer used as a GPU copy source.
     pub buffer_copy_offset: wgt::BufferSize,
+
     /// The alignment of the row pitch of the texture data stored in a buffer that is
     /// used in a GPU copy operation.
     pub buffer_copy_pitch: wgt::BufferSize,
+
+    /// The finest alignment of bound range checking for uniform buffers.
+    ///
+    /// When `wgpu_hal` restricts shader references to the [accessible
+    /// region][ar] of a [`Uniform`] buffer, the size of the accessible region
+    /// is the bind group binding's stated [size], rounded up to the next
+    /// multiple of this value.
+    ///
+    /// We don't need an analogous field for storage buffer bindings, because
+    /// all our backends promise to enforce the size at least to a four-byte
+    /// alignment, and `wgpu_hal` requires bound range lengths to be a multiple
+    /// of four anyway.
+    ///
+    /// [ar]: struct.BufferBinding.html#accessible-region
+    /// [`Uniform`]: wgt::BufferBindingType::Uniform
+    /// [size]: BufferBinding::size
+    pub uniform_bounds_check_alignment: wgt::BufferSize,
+
+    /// The size of the raw TLAS instance
+    pub raw_tlas_instance_size: usize,
+
+    /// What the scratch buffer for building an acceleration structure must be aligned to
+    pub ray_tracing_scratch_buffer_alignment: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -1780,6 +1955,40 @@ pub struct PipelineLayoutDescriptor<'a, B: DynBindGroupLayout + ?Sized> {
     pub push_constant_ranges: &'a [wgt::PushConstantRange],
 }
 
+/// A region of a buffer made visible to shaders via a [`BindGroup`].
+///
+/// [`BindGroup`]: Api::BindGroup
+///
+/// ## Accessible region
+///
+/// `wgpu_hal` guarantees that shaders compiled with
+/// [`ShaderModuleDescriptor::runtime_checks`] set to `true` cannot read or
+/// write data via this binding outside the *accessible region* of [`buffer`]:
+///
+/// - The accessible region starts at [`offset`].
+///
+/// - For [`Storage`] bindings, the size of the accessible region is [`size`],
+///   which must be a multiple of 4.
+///
+/// - For [`Uniform`] bindings, the size of the accessible region is [`size`]
+///   rounded up to the next multiple of
+///   [`Alignments::uniform_bounds_check_alignment`].
+///
+/// Note that this guarantee is stricter than WGSL's requirements for
+/// [out-of-bounds accesses][woob], as WGSL allows them to return values from
+/// elsewhere in the buffer. But this guarantee is necessary anyway, to permit
+/// `wgpu-core` to avoid clearing uninitialized regions of buffers that will
+/// never be read by the application before they are overwritten. This
+/// optimization consults bind group buffer binding regions to determine which
+/// parts of which buffers shaders might observe. This optimization is only
+/// sound if shader access is bounds-checked.
+///
+/// [`buffer`]: BufferBinding::buffer
+/// [`offset`]: BufferBinding::offset
+/// [`size`]: BufferBinding::size
+/// [`Storage`]: wgt::BufferBindingType::Storage
+/// [`Uniform`]: wgt::BufferBindingType::Uniform
+/// [woob]: https://gpuweb.github.io/gpuweb/wgsl/#out-of-bounds-access-sec
 #[derive(Debug)]
 pub struct BufferBinding<'a, B: DynBuffer + ?Sized> {
     /// The buffer being bound.
@@ -1898,7 +2107,13 @@ pub enum ShaderInput<'a> {
 
 pub struct ShaderModuleDescriptor<'a> {
     pub label: Label<'a>,
-    pub runtime_checks: bool,
+
+    /// # Safety
+    ///
+    /// See the documentation for each flag in [`ShaderRuntimeChecks`][src].
+    ///
+    /// [src]: wgt::ShaderRuntimeChecks
+    pub runtime_checks: wgt::ShaderRuntimeChecks,
 }
 
 #[derive(Debug, Clone)]
@@ -2029,17 +2244,23 @@ pub struct Rect<T> {
     pub h: T,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct StateTransition<T> {
+    pub from: T,
+    pub to: T,
+}
+
 #[derive(Debug, Clone)]
 pub struct BufferBarrier<'a, B: DynBuffer + ?Sized> {
     pub buffer: &'a B,
-    pub usage: Range<BufferUses>,
+    pub usage: StateTransition<BufferUses>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TextureBarrier<'a, T: DynTexture + ?Sized> {
     pub texture: &'a T,
     pub range: wgt::ImageSubresourceRange,
-    pub usage: Range<TextureUses>,
+    pub usage: StateTransition<TextureUses>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2075,7 +2296,7 @@ pub struct TextureCopy {
 
 #[derive(Clone, Debug)]
 pub struct BufferTextureCopy {
-    pub buffer_layout: wgt::ImageDataLayout,
+    pub buffer_layout: wgt::TexelCopyBufferLayout,
     pub texture_base: TextureCopyBase,
     pub size: CopyExtent,
 }
@@ -2303,5 +2524,13 @@ bitflags::bitflags! {
 
 #[derive(Debug, Clone)]
 pub struct AccelerationStructureBarrier {
-    pub usage: Range<AccelerationStructureUses>,
+    pub usage: StateTransition<AccelerationStructureUses>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct TlasInstance {
+    pub transform: [f32; 12],
+    pub custom_index: u32,
+    pub mask: u8,
+    pub blas_address: u64,
 }

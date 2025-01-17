@@ -105,6 +105,8 @@ kernel void main_(
             int _e88 = cVelCount;
             cVelCount = _e88 + 1;
         }
+#define LOOP_IS_BOUNDED { volatile bool unpredictable_break_from_loop = false; if (unpredictable_break_from_loop) break; }
+        LOOP_IS_BOUNDED
     }
     int _e94 = cMassCount;
     if (_e94 > 0) {

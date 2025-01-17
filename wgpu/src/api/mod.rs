@@ -19,11 +19,11 @@
 //! - Avoid having to write out a long list of imports for each module.
 //! - Allow docs to be written naturally, without needing to worry about needing dedicated doc imports.
 //! - Treat wgpu-types types and wgpu-core types as a single set.
-//!
 
 mod adapter;
 mod bind_group;
 mod bind_group_layout;
+mod blas;
 mod buffer;
 mod command_buffer;
 mod command_encoder;
@@ -32,7 +32,6 @@ mod common_pipeline;
 mod compute_pass;
 mod compute_pipeline;
 mod device;
-mod id;
 mod instance;
 mod pipeline_cache;
 mod pipeline_layout;
@@ -48,10 +47,12 @@ mod surface;
 mod surface_texture;
 mod texture;
 mod texture_view;
+mod tlas;
 
 pub use adapter::*;
 pub use bind_group::*;
 pub use bind_group_layout::*;
+pub use blas::*;
 pub use buffer::*;
 pub use command_buffer::*;
 pub use command_encoder::*;
@@ -59,7 +60,6 @@ pub use common_pipeline::*;
 pub use compute_pass::*;
 pub use compute_pipeline::*;
 pub use device::*;
-pub use id::*;
 pub use instance::*;
 pub use pipeline_cache::*;
 pub use pipeline_layout::*;
@@ -75,6 +75,24 @@ pub use surface::*;
 pub use surface_texture::*;
 pub use texture::*;
 pub use texture_view::*;
+pub use tlas::*;
 
 /// Object debugging label.
 pub type Label<'a> = Option<&'a str>;
+
+/// A cute utility type that works just like PhantomData, but also
+/// implements Drop. This forces any lifetimes that are associated
+/// with the type to be used until the Drop impl is ran. This prevents
+/// lifetimes from being shortened.
+#[derive(Debug)]
+pub(crate) struct PhantomDrop<T>(std::marker::PhantomData<T>);
+
+impl<T> Default for PhantomDrop<T> {
+    fn default() -> Self {
+        Self(std::marker::PhantomData)
+    }
+}
+
+impl<T> Drop for PhantomDrop<T> {
+    fn drop(&mut self) {}
+}

@@ -14,7 +14,9 @@ use winit::{
 
 use std::{
     borrow::{Borrow, Cow},
-    iter, mem, ptr,
+    iter,
+    mem::size_of,
+    ptr,
     time::Instant,
 };
 
@@ -175,7 +177,7 @@ impl<A: hal::Api> Example<A> {
         };
         let shader_desc = hal::ShaderModuleDescriptor {
             label: None,
-            runtime_checks: false,
+            runtime_checks: wgt::ShaderRuntimeChecks::checked(),
         };
         let shader = unsafe {
             device
@@ -193,7 +195,7 @@ impl<A: hal::Api> Example<A> {
                     ty: wgt::BindingType::Buffer {
                         ty: wgt::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: wgt::BufferSize::new(mem::size_of::<Globals>() as _),
+                        min_binding_size: wgt::BufferSize::new(size_of::<Globals>() as _),
                     },
                     count: None,
                 },
@@ -228,7 +230,7 @@ impl<A: hal::Api> Example<A> {
                 ty: wgt::BindingType::Buffer {
                     ty: wgt::BufferBindingType::Uniform,
                     has_dynamic_offset: true,
-                    min_binding_size: wgt::BufferSize::new(mem::size_of::<Locals>() as _),
+                    min_binding_size: wgt::BufferSize::new(size_of::<Locals>() as _),
                 },
                 count: None,
             }],
@@ -329,20 +331,29 @@ impl<A: hal::Api> Example<A> {
         {
             let buffer_barrier = hal::BufferBarrier {
                 buffer: &staging_buffer,
-                usage: hal::BufferUses::empty()..hal::BufferUses::COPY_SRC,
+                usage: hal::StateTransition {
+                    from: hal::BufferUses::empty(),
+                    to: hal::BufferUses::COPY_SRC,
+                },
             };
             let texture_barrier1 = hal::TextureBarrier {
                 texture: &texture,
                 range: wgt::ImageSubresourceRange::default(),
-                usage: hal::TextureUses::UNINITIALIZED..hal::TextureUses::COPY_DST,
+                usage: hal::StateTransition {
+                    from: hal::TextureUses::UNINITIALIZED,
+                    to: hal::TextureUses::COPY_DST,
+                },
             };
             let texture_barrier2 = hal::TextureBarrier {
                 texture: &texture,
                 range: wgt::ImageSubresourceRange::default(),
-                usage: hal::TextureUses::COPY_DST..hal::TextureUses::RESOURCE,
+                usage: hal::StateTransition {
+                    from: hal::TextureUses::COPY_DST,
+                    to: hal::TextureUses::RESOURCE,
+                },
             };
             let copy = hal::BufferTextureCopy {
-                buffer_layout: wgt::ImageDataLayout {
+                buffer_layout: wgt::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(4),
                     rows_per_image: None,
@@ -394,7 +405,7 @@ impl<A: hal::Api> Example<A> {
 
         let global_buffer_desc = hal::BufferDescriptor {
             label: Some("global"),
-            size: mem::size_of::<Globals>() as wgt::BufferAddress,
+            size: size_of::<Globals>() as wgt::BufferAddress,
             usage: hal::BufferUses::MAP_WRITE | hal::BufferUses::UNIFORM,
             memory_flags: hal::MemoryFlags::PREFER_COHERENT,
         };
@@ -406,7 +417,7 @@ impl<A: hal::Api> Example<A> {
             ptr::copy_nonoverlapping(
                 &globals as *const Globals as *const u8,
                 mapping.ptr.as_ptr(),
-                mem::size_of::<Globals>(),
+                size_of::<Globals>(),
             );
             device.unmap_buffer(&buffer);
             assert!(mapping.is_coherent);
@@ -414,7 +425,7 @@ impl<A: hal::Api> Example<A> {
         };
 
         let local_alignment = wgt::math::align_to(
-            mem::size_of::<Locals>() as u32,
+            size_of::<Locals>() as u32,
             capabilities.limits.min_uniform_buffer_offset_alignment,
         );
         let local_buffer_desc = hal::BufferDescriptor {
@@ -476,7 +487,7 @@ impl<A: hal::Api> Example<A> {
             let local_buffer_binding = hal::BufferBinding {
                 buffer: &local_buffer,
                 offset: 0,
-                size: wgt::BufferSize::new(mem::size_of::<Locals>() as _),
+                size: wgt::BufferSize::new(size_of::<Locals>() as _),
             };
             let local_group_desc = hal::BindGroupDescriptor {
                 label: Some("local"),
@@ -557,7 +568,7 @@ impl<A: hal::Api> Example<A> {
 
             for mut ctx in self.contexts {
                 ctx.wait_and_clear(&self.device);
-                self.device.destroy_command_encoder(ctx.encoder);
+                drop(ctx.encoder);
                 self.device.destroy_fence(ctx.fence);
             }
 
@@ -577,7 +588,8 @@ impl<A: hal::Api> Example<A> {
             self.device.destroy_pipeline_layout(self.pipeline_layout);
 
             self.surface.unconfigure(&self.device);
-            self.device.exit(self.queue);
+            drop(self.queue);
+            drop(self.device);
             drop(self.surface);
             drop(self.adapter);
         }
@@ -662,7 +674,10 @@ impl<A: hal::Api> Example<A> {
         let target_barrier0 = hal::TextureBarrier {
             texture: surface_tex.borrow(),
             range: wgt::ImageSubresourceRange::default(),
-            usage: hal::TextureUses::UNINITIALIZED..hal::TextureUses::COLOR_TARGET,
+            usage: hal::StateTransition {
+                from: hal::TextureUses::UNINITIALIZED,
+                to: hal::TextureUses::COLOR_TARGET,
+            },
         };
         unsafe {
             ctx.encoder.begin_encoding(Some("frame")).unwrap();
@@ -729,7 +744,10 @@ impl<A: hal::Api> Example<A> {
         let target_barrier1 = hal::TextureBarrier {
             texture: surface_tex.borrow(),
             range: wgt::ImageSubresourceRange::default(),
-            usage: hal::TextureUses::COLOR_TARGET..hal::TextureUses::PRESENT,
+            usage: hal::StateTransition {
+                from: hal::TextureUses::COLOR_TARGET,
+                to: hal::TextureUses::PRESENT,
+            },
         };
         unsafe {
             ctx.encoder.end_render_pass();
@@ -779,7 +797,7 @@ impl<A: hal::Api> Example<A> {
 
 cfg_if::cfg_if! {
     // Apple + Metal
-    if #[cfg(all(any(target_os = "macos", target_os = "ios"), feature = "metal"))] {
+    if #[cfg(all(target_vendor = "apple", feature = "metal"))] {
         type Api = hal::api::Metal;
     }
     // Wasm + Vulkan

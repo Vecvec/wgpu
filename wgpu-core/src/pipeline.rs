@@ -4,7 +4,7 @@ use crate::{
     command::ColorAttachmentError,
     device::{Device, DeviceError, MissingDownlevelFlags, MissingFeatures, RenderPassContext},
     id::{PipelineCacheId, PipelineLayoutId, ShaderModuleId},
-    resource::{Labeled, TrackingData},
+    resource::{InvalidResourceError, Labeled, TrackingData},
     resource_log, validation, Label,
 };
 use arrayvec::ArrayVec;
@@ -41,7 +41,7 @@ pub enum ShaderModuleSource<'a> {
 pub struct ShaderModuleDescriptor<'a> {
     pub label: Label<'a>,
     #[cfg_attr(feature = "serde", serde(default))]
-    pub shader_bound_checks: wgt::ShaderBoundChecks,
+    pub runtime_checks: wgt::ShaderRuntimeChecks,
 }
 
 #[derive(Debug)]
@@ -92,7 +92,7 @@ impl ShaderModule {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum CreateShaderModuleError {
-    #[cfg(feature = "wgsl")]
+    #[cfg(any(feature = "wgsl", feature = "indirect-validation"))]
     #[error(transparent)]
     Parsing(#[from] ShaderError<naga::front::wgsl::ParseError>),
     #[cfg(feature = "glsl")]
@@ -222,10 +222,6 @@ pub struct ResolvedComputePipelineDescriptor<'a> {
 pub enum CreateComputePipelineError {
     #[error(transparent)]
     Device(#[from] DeviceError),
-    #[error("Pipeline layout is invalid")]
-    InvalidLayout,
-    #[error("Cache is invalid")]
-    InvalidCache,
     #[error("Unable to derive an implicit layout")]
     Implicit(#[from] ImplicitLayoutError),
     #[error("Error matching shader requirements against the pipeline")]
@@ -236,6 +232,8 @@ pub enum CreateComputePipelineError {
     PipelineConstants(String),
     #[error(transparent)]
     MissingDownlevelFlags(#[from] MissingDownlevelFlags),
+    #[error(transparent)]
+    InvalidResource(#[from] InvalidResourceError),
 }
 
 #[derive(Debug)]
@@ -282,18 +280,6 @@ pub enum CreatePipelineCacheError {
     Validation(#[from] PipelineCacheValidationError),
     #[error(transparent)]
     MissingFeatures(#[from] MissingFeatures),
-    #[error("Internal error: {0}")]
-    Internal(String),
-}
-
-impl From<hal::PipelineCacheError> for CreatePipelineCacheError {
-    fn from(value: hal::PipelineCacheError) -> Self {
-        match value {
-            hal::PipelineCacheError::Device(device) => {
-                CreatePipelineCacheError::Device(device.into())
-            }
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -451,8 +437,6 @@ pub enum ColorStateError {
         pipeline: validation::NumericType,
         shader: validation::NumericType,
     },
-    #[error("Blend factors for {0:?} must be `One`")]
-    InvalidMinMaxBlendFactors(wgt::BlendComponent),
     #[error("Invalid write mask {0:?}")]
     InvalidWriteMask(wgt::ColorWrites),
 }
@@ -477,10 +461,6 @@ pub enum CreateRenderPipelineError {
     ColorAttachment(#[from] ColorAttachmentError),
     #[error(transparent)]
     Device(#[from] DeviceError),
-    #[error("Pipeline layout is invalid")]
-    InvalidLayout,
-    #[error("Pipeline cache is invalid")]
-    InvalidCache,
     #[error("Unable to derive an implicit layout")]
     Implicit(#[from] ImplicitLayoutError),
     #[error("Color state [{0}] is invalid")]
@@ -495,6 +475,12 @@ pub enum CreateRenderPipelineError {
     TooManyVertexAttributes { given: u32, limit: u32 },
     #[error("Vertex buffer {index} stride {given} exceeds the limit {limit}")]
     VertexStrideTooLarge { index: u32, given: u32, limit: u32 },
+    #[error("Vertex attribute at location {location} stride {given} exceeds the limit {limit}")]
+    VertexAttributeStrideTooLarge {
+        location: wgt::ShaderLocation,
+        given: u32,
+        limit: u32,
+    },
     #[error("Vertex buffer {index} stride {stride} does not respect `VERTEX_STRIDE_ALIGNMENT`")]
     UnalignedVertexStride {
         index: u32,
@@ -550,6 +536,8 @@ pub enum CreateRenderPipelineError {
         "but no render target for the pipeline was specified."
     ))]
     NoTargetSpecified,
+    #[error(transparent)]
+    InvalidResource(#[from] InvalidResourceError),
 }
 
 bitflags::bitflags! {

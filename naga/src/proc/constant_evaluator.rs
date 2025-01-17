@@ -137,8 +137,8 @@ macro_rules! gen_component_wise_extractor {
                             for idx in 0..(size as u8).into() {
                                 let group = component_groups
                                     .iter()
-                                    .map(|cs| cs[idx])
-                                    .collect::<ArrayVec<_, N>>()
+                                    .map(|cs| cs.get(idx).cloned().ok_or(err.clone()))
+                                    .collect::<Result<ArrayVec<_, N>, _>>()?
                                     .into_inner()
                                     .unwrap();
                                 new_components.push($ident(
@@ -317,7 +317,7 @@ pub struct ConstantEvaluator<'a> {
 #[derive(Debug)]
 enum WgslRestrictions<'a> {
     /// - const-expressions will be evaluated and inserted in the arena
-    Const,
+    Const(Option<FunctionLocalData<'a>>),
     /// - const-expressions will be evaluated and inserted in the arena
     /// - override-expressions will be inserted in the arena
     Override,
@@ -347,6 +347,8 @@ struct FunctionLocalData<'a> {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum ExpressionKind {
+    /// If const is also implemented as const
+    ImplConst,
     Const,
     Override,
     Runtime,
@@ -372,14 +374,23 @@ impl ExpressionKindTracker {
     pub fn insert(&mut self, value: Handle<Expression>, expr_type: ExpressionKind) {
         self.inner.insert(value, expr_type);
     }
+
     pub fn is_const(&self, h: Handle<Expression>) -> bool {
-        matches!(self.type_of(h), ExpressionKind::Const)
+        matches!(
+            self.type_of(h),
+            ExpressionKind::Const | ExpressionKind::ImplConst
+        )
+    }
+
+    /// Returns `true` if naga can also evaluate expression as const
+    pub fn is_impl_const(&self, h: Handle<Expression>) -> bool {
+        matches!(self.type_of(h), ExpressionKind::ImplConst)
     }
 
     pub fn is_const_or_override(&self, h: Handle<Expression>) -> bool {
         matches!(
             self.type_of(h),
-            ExpressionKind::Const | ExpressionKind::Override
+            ExpressionKind::Const | ExpressionKind::Override | ExpressionKind::ImplConst
         )
     }
 
@@ -400,13 +411,14 @@ impl ExpressionKindTracker {
     }
 
     fn type_of_with_expr(&self, expr: &Expression) -> ExpressionKind {
+        use crate::MathFunction as Mf;
         match *expr {
             Expression::Literal(_) | Expression::ZeroValue(_) | Expression::Constant(_) => {
-                ExpressionKind::Const
+                ExpressionKind::ImplConst
             }
             Expression::Override(_) => ExpressionKind::Override,
             Expression::Compose { ref components, .. } => {
-                let mut expr_type = ExpressionKind::Const;
+                let mut expr_type = ExpressionKind::ImplConst;
                 for component in components {
                     expr_type = expr_type.max(self.type_of(*component))
                 }
@@ -417,13 +429,16 @@ impl ExpressionKindTracker {
             Expression::Access { base, index } => self.type_of(base).max(self.type_of(index)),
             Expression::Swizzle { vector, .. } => self.type_of(vector),
             Expression::Unary { expr, .. } => self.type_of(expr),
-            Expression::Binary { left, right, .. } => self.type_of(left).max(self.type_of(right)),
+            Expression::Binary { left, right, .. } => self
+                .type_of(left)
+                .max(self.type_of(right))
+                .max(ExpressionKind::Const),
             Expression::Math {
+                fun,
                 arg,
                 arg1,
                 arg2,
                 arg3,
-                ..
             } => self
                 .type_of(arg)
                 .max(
@@ -437,8 +452,34 @@ impl ExpressionKindTracker {
                 .max(
                     arg3.map(|arg| self.type_of(arg))
                         .unwrap_or(ExpressionKind::Const),
+                )
+                .max(
+                    if matches!(
+                        fun,
+                        Mf::Dot
+                            | Mf::Outer
+                            | Mf::Cross
+                            | Mf::Distance
+                            | Mf::Length
+                            | Mf::Normalize
+                            | Mf::FaceForward
+                            | Mf::Reflect
+                            | Mf::Refract
+                            | Mf::Ldexp
+                            | Mf::Modf
+                            | Mf::Mix
+                            | Mf::Frexp
+                    ) {
+                        ExpressionKind::Const
+                    } else {
+                        ExpressionKind::ImplConst
+                    },
                 ),
-            Expression::As { expr, .. } => self.type_of(expr),
+            Expression::As { convert, expr, .. } => self.type_of(expr).max(if convert.is_some() {
+                ExpressionKind::ImplConst
+            } else {
+                ExpressionKind::Const
+            }),
             Expression::Select {
                 condition,
                 accept,
@@ -446,7 +487,8 @@ impl ExpressionKindTracker {
             } => self
                 .type_of(condition)
                 .max(self.type_of(accept))
-                .max(self.type_of(reject)),
+                .max(self.type_of(reject))
+                .max(ExpressionKind::Const),
             Expression::Relational { argument, .. } => self.type_of(argument),
             Expression::ArrayLength(expr) => self.type_of(expr),
             _ => ExpressionKind::Runtime,
@@ -467,6 +509,8 @@ pub enum ConstantEvaluatorError {
     InvalidArrayLengthArg,
     #[error("Constants cannot get the array length of a dynamically sized array")]
     ArrayLengthDynamic,
+    #[error("Cannot call arrayLength on array sized by override-expression")]
+    ArrayLengthOverridden,
     #[error("Constants cannot call functions")]
     Call,
     #[error("Constants don't support workGroupUniformLoad")]
@@ -556,7 +600,7 @@ impl<'a> ConstantEvaluator<'a> {
             Behavior::Wgsl(if in_override_ctx {
                 WgslRestrictions::Override
             } else {
-                WgslRestrictions::Const
+                WgslRestrictions::Const(None)
             }),
             module,
             global_expression_kind_tracker,
@@ -603,13 +647,19 @@ impl<'a> ConstantEvaluator<'a> {
         local_expression_kind_tracker: &'a mut ExpressionKindTracker,
         emitter: &'a mut super::Emitter,
         block: &'a mut crate::Block,
+        is_const: bool,
     ) -> Self {
+        let local_data = FunctionLocalData {
+            global_expressions: &module.global_expressions,
+            emitter,
+            block,
+        };
         Self {
-            behavior: Behavior::Wgsl(WgslRestrictions::Runtime(FunctionLocalData {
-                global_expressions: &module.global_expressions,
-                emitter,
-                block,
-            })),
+            behavior: Behavior::Wgsl(if is_const {
+                WgslRestrictions::Const(Some(local_data))
+            } else {
+                WgslRestrictions::Runtime(local_data)
+            }),
             types: &mut module.types,
             constants: &module.constants,
             overrides: &module.overrides,
@@ -718,6 +768,7 @@ impl<'a> ConstantEvaluator<'a> {
         span: Span,
     ) -> Result<Handle<Expression>, ConstantEvaluatorError> {
         match self.expression_kind_tracker.type_of_with_expr(&expr) {
+            ExpressionKind::ImplConst => self.try_eval_and_append_impl(&expr, span),
             ExpressionKind::Const => {
                 let eval_result = self.try_eval_and_append_impl(&expr, span);
                 // We should be able to evaluate `Const` expressions at this
@@ -740,7 +791,7 @@ impl<'a> ConstantEvaluator<'a> {
                 Behavior::Wgsl(WgslRestrictions::Override | WgslRestrictions::Runtime(_)) => {
                     Ok(self.append_expr(expr, span, ExpressionKind::Override))
                 }
-                Behavior::Wgsl(WgslRestrictions::Const) => {
+                Behavior::Wgsl(WgslRestrictions::Const(_)) => {
                     Err(ConstantEvaluatorError::OverrideExpr)
                 }
                 Behavior::Glsl(_) => {
@@ -761,14 +812,17 @@ impl<'a> ConstantEvaluator<'a> {
     const fn is_global_arena(&self) -> bool {
         matches!(
             self.behavior,
-            Behavior::Wgsl(WgslRestrictions::Const | WgslRestrictions::Override)
+            Behavior::Wgsl(WgslRestrictions::Const(None) | WgslRestrictions::Override)
                 | Behavior::Glsl(GlslRestrictions::Const)
         )
     }
 
     const fn function_local_data(&self) -> Option<&FunctionLocalData<'a>> {
         match self.behavior {
-            Behavior::Wgsl(WgslRestrictions::Runtime(ref function_local_data))
+            Behavior::Wgsl(
+                WgslRestrictions::Runtime(ref function_local_data)
+                | WgslRestrictions::Const(Some(ref function_local_data)),
+            )
             | Behavior::Glsl(GlslRestrictions::Runtime(ref function_local_data)) => {
                 Some(function_local_data)
             }
@@ -1125,8 +1179,8 @@ impl<'a> ConstantEvaluator<'a> {
                 component_wise_float!(self, span, [arg], |e| { Ok([e.floor()]) })
             }
             crate::MathFunction::Round => {
-                // TODO: Use `f{32,64}.round_ties_even()` when available on stable. This polyfill
-                // is shamelessly [~~stolen from~~ inspired by `ndarray-image`][polyfill source],
+                // TODO: this hit stable on 1.77, but MSRV hasn't caught up yet
+                // This polyfill is shamelessly [~~stolen from~~ inspired by `ndarray-image`][polyfill source],
                 // which has licensing compatible with ours. See also
                 // <https://github.com/rust-lang/rust/issues/96710>.
                 //
@@ -1261,6 +1315,7 @@ impl<'a> ConstantEvaluator<'a> {
                             let expr = Expression::Literal(Literal::U32(len.get()));
                             self.register_evaluated_expr(expr, span)
                         }
+                        ArraySize::Pending(_) => Err(ConstantEvaluatorError::ArrayLengthOverridden),
                         ArraySize::Dynamic => Err(ConstantEvaluatorError::ArrayLengthDynamic),
                     },
                     _ => Err(ConstantEvaluatorError::InvalidArrayLengthArg),
@@ -1692,6 +1747,7 @@ impl<'a> ConstantEvaluator<'a> {
             Expression::Literal(value) => Expression::Literal(match op {
                 UnaryOperator::Negate => match value {
                     Literal::I32(v) => Literal::I32(v.wrapping_neg()),
+                    Literal::I64(v) => Literal::I64(v.wrapping_neg()),
                     Literal::F32(v) => Literal::F32(-v),
                     Literal::AbstractInt(v) => Literal::AbstractInt(v.wrapping_neg()),
                     Literal::AbstractFloat(v) => Literal::AbstractFloat(-v),
@@ -1703,7 +1759,9 @@ impl<'a> ConstantEvaluator<'a> {
                 },
                 UnaryOperator::BitwiseNot => match value {
                     Literal::I32(v) => Literal::I32(!v),
+                    Literal::I64(v) => Literal::I64(!v),
                     Literal::U32(v) => Literal::U32(!v),
+                    Literal::U64(v) => Literal::U64(!v),
                     Literal::AbstractInt(v) => Literal::AbstractInt(!v),
                     _ => return Err(ConstantEvaluatorError::InvalidUnaryOpArg),
                 },
@@ -1752,38 +1810,36 @@ impl<'a> ConstantEvaluator<'a> {
 
                     _ => match (left_value, right_value) {
                         (Literal::I32(a), Literal::I32(b)) => Literal::I32(match op {
-                            BinaryOperator::Add => a.checked_add(b).ok_or_else(|| {
-                                ConstantEvaluatorError::Overflow("addition".into())
-                            })?,
-                            BinaryOperator::Subtract => a.checked_sub(b).ok_or_else(|| {
-                                ConstantEvaluatorError::Overflow("subtraction".into())
-                            })?,
-                            BinaryOperator::Multiply => a.checked_mul(b).ok_or_else(|| {
-                                ConstantEvaluatorError::Overflow("multiplication".into())
-                            })?,
-                            BinaryOperator::Divide => a.checked_div(b).ok_or_else(|| {
+                            BinaryOperator::Add => a.wrapping_add(b),
+                            BinaryOperator::Subtract => a.wrapping_sub(b),
+                            BinaryOperator::Multiply => a.wrapping_mul(b),
+                            BinaryOperator::Divide => {
                                 if b == 0 {
-                                    ConstantEvaluatorError::DivisionByZero
+                                    return Err(ConstantEvaluatorError::DivisionByZero);
                                 } else {
-                                    ConstantEvaluatorError::Overflow("division".into())
+                                    a.wrapping_div(b)
                                 }
-                            })?,
-                            BinaryOperator::Modulo => a.checked_rem(b).ok_or_else(|| {
+                            }
+                            BinaryOperator::Modulo => {
                                 if b == 0 {
-                                    ConstantEvaluatorError::RemainderByZero
+                                    return Err(ConstantEvaluatorError::RemainderByZero);
                                 } else {
-                                    ConstantEvaluatorError::Overflow("remainder".into())
+                                    a.wrapping_rem(b)
                                 }
-                            })?,
+                            }
                             BinaryOperator::And => a & b,
                             BinaryOperator::ExclusiveOr => a ^ b,
                             BinaryOperator::InclusiveOr => a | b,
                             _ => return Err(ConstantEvaluatorError::InvalidBinaryOpArgs),
                         }),
                         (Literal::I32(a), Literal::U32(b)) => Literal::I32(match op {
-                            BinaryOperator::ShiftLeft => a
-                                .checked_shl(b)
-                                .ok_or(ConstantEvaluatorError::ShiftedMoreThan32Bits)?,
+                            BinaryOperator::ShiftLeft => {
+                                if (if a.is_negative() { !a } else { a }).leading_zeros() <= b {
+                                    return Err(ConstantEvaluatorError::Overflow("<<".to_string()));
+                                }
+                                a.checked_shl(b)
+                                    .ok_or(ConstantEvaluatorError::ShiftedMoreThan32Bits)?
+                            }
                             BinaryOperator::ShiftRight => a
                                 .checked_shr(b)
                                 .ok_or(ConstantEvaluatorError::ShiftedMoreThan32Bits)?,
@@ -1809,8 +1865,11 @@ impl<'a> ConstantEvaluator<'a> {
                             BinaryOperator::ExclusiveOr => a ^ b,
                             BinaryOperator::InclusiveOr => a | b,
                             BinaryOperator::ShiftLeft => a
-                                .checked_shl(b)
-                                .ok_or(ConstantEvaluatorError::ShiftedMoreThan32Bits)?,
+                                .checked_mul(
+                                    1u32.checked_shl(b)
+                                        .ok_or(ConstantEvaluatorError::ShiftedMoreThan32Bits)?,
+                                )
+                                .ok_or(ConstantEvaluatorError::Overflow("<<".to_string()))?,
                             BinaryOperator::ShiftRight => a
                                 .checked_shr(b)
                                 .ok_or(ConstantEvaluatorError::ShiftedMoreThan32Bits)?,
@@ -1824,6 +1883,20 @@ impl<'a> ConstantEvaluator<'a> {
                             BinaryOperator::Modulo => a % b,
                             _ => return Err(ConstantEvaluatorError::InvalidBinaryOpArgs),
                         }),
+                        (Literal::AbstractInt(a), Literal::U32(b)) => {
+                            Literal::AbstractInt(match op {
+                                BinaryOperator::ShiftLeft => {
+                                    if (if a.is_negative() { !a } else { a }).leading_zeros() <= b {
+                                        return Err(ConstantEvaluatorError::Overflow(
+                                            "<<".to_string(),
+                                        ));
+                                    }
+                                    a.checked_shl(b).unwrap_or(0)
+                                }
+                                BinaryOperator::ShiftRight => a.checked_shr(b).unwrap_or(0),
+                                _ => return Err(ConstantEvaluatorError::InvalidBinaryOpArgs),
+                            })
+                        }
                         (Literal::AbstractInt(a), Literal::AbstractInt(b)) => {
                             Literal::AbstractInt(match op {
                                 BinaryOperator::Add => a.checked_add(b).ok_or_else(|| {
@@ -2059,7 +2132,10 @@ impl<'a> ConstantEvaluator<'a> {
         expr_type: ExpressionKind,
     ) -> Handle<Expression> {
         let h = match self.behavior {
-            Behavior::Wgsl(WgslRestrictions::Runtime(ref mut function_local_data))
+            Behavior::Wgsl(
+                WgslRestrictions::Runtime(ref mut function_local_data)
+                | WgslRestrictions::Const(Some(ref mut function_local_data)),
+            )
             | Behavior::Glsl(GlslRestrictions::Runtime(ref mut function_local_data)) => {
                 let is_running = function_local_data.emitter.is_running();
                 let needs_pre_emit = expr.needs_pre_emit();
@@ -2482,7 +2558,7 @@ mod tests {
 
         let expression_kind_tracker = &mut ExpressionKindTracker::from_arena(&global_expressions);
         let mut solver = ConstantEvaluator {
-            behavior: Behavior::Wgsl(WgslRestrictions::Const),
+            behavior: Behavior::Wgsl(WgslRestrictions::Const(None)),
             types: &mut types,
             constants: &constants,
             overrides: &overrides,
@@ -2568,7 +2644,7 @@ mod tests {
 
         let expression_kind_tracker = &mut ExpressionKindTracker::from_arena(&global_expressions);
         let mut solver = ConstantEvaluator {
-            behavior: Behavior::Wgsl(WgslRestrictions::Const),
+            behavior: Behavior::Wgsl(WgslRestrictions::Const(None)),
             types: &mut types,
             constants: &constants,
             overrides: &overrides,
@@ -2686,7 +2762,7 @@ mod tests {
 
         let expression_kind_tracker = &mut ExpressionKindTracker::from_arena(&global_expressions);
         let mut solver = ConstantEvaluator {
-            behavior: Behavior::Wgsl(WgslRestrictions::Const),
+            behavior: Behavior::Wgsl(WgslRestrictions::Const(None)),
             types: &mut types,
             constants: &constants,
             overrides: &overrides,
@@ -2779,7 +2855,7 @@ mod tests {
 
         let expression_kind_tracker = &mut ExpressionKindTracker::from_arena(&global_expressions);
         let mut solver = ConstantEvaluator {
-            behavior: Behavior::Wgsl(WgslRestrictions::Const),
+            behavior: Behavior::Wgsl(WgslRestrictions::Const(None)),
             types: &mut types,
             constants: &constants,
             overrides: &overrides,
@@ -2861,7 +2937,7 @@ mod tests {
 
         let expression_kind_tracker = &mut ExpressionKindTracker::from_arena(&global_expressions);
         let mut solver = ConstantEvaluator {
-            behavior: Behavior::Wgsl(WgslRestrictions::Const),
+            behavior: Behavior::Wgsl(WgslRestrictions::Const(None)),
             types: &mut types,
             constants: &constants,
             overrides: &overrides,

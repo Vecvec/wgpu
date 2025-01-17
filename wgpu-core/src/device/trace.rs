@@ -121,12 +121,23 @@ pub enum Action<'a> {
         queued: bool,
     },
     WriteTexture {
-        to: crate::command::ImageCopyTexture,
+        to: crate::command::TexelCopyTextureInfo,
         data: FileName,
-        layout: wgt::ImageDataLayout,
+        layout: wgt::TexelCopyBufferLayout,
         size: wgt::Extent3d,
     },
     Submit(crate::SubmissionIndex, Vec<Command>),
+    CreateBlas {
+        id: id::BlasId,
+        desc: crate::resource::BlasDescriptor<'a>,
+        sizes: wgt::BlasGeometrySizeDescriptors,
+    },
+    DestroyBlas(id::BlasId),
+    CreateTlas {
+        id: id::TlasId,
+        desc: crate::resource::TlasDescriptor<'a>,
+    },
+    DestroyTlas(id::TlasId),
 }
 
 #[derive(Debug)]
@@ -140,18 +151,18 @@ pub enum Command {
         size: wgt::BufferAddress,
     },
     CopyBufferToTexture {
-        src: crate::command::ImageCopyBuffer,
-        dst: crate::command::ImageCopyTexture,
+        src: crate::command::TexelCopyBufferInfo,
+        dst: crate::command::TexelCopyTextureInfo,
         size: wgt::Extent3d,
     },
     CopyTextureToBuffer {
-        src: crate::command::ImageCopyTexture,
-        dst: crate::command::ImageCopyBuffer,
+        src: crate::command::TexelCopyTextureInfo,
+        dst: crate::command::TexelCopyBufferInfo,
         size: wgt::Extent3d,
     },
     CopyTextureToTexture {
-        src: crate::command::ImageCopyTexture,
-        dst: crate::command::ImageCopyTexture,
+        src: crate::command::TexelCopyTextureInfo,
+        dst: crate::command::TexelCopyTextureInfo,
         size: wgt::Extent3d,
     },
     ClearBuffer {
@@ -188,6 +199,14 @@ pub enum Command {
         timestamp_writes: Option<crate::command::PassTimestampWrites>,
         occlusion_query_set_id: Option<id::QuerySetId>,
     },
+    BuildAccelerationStructuresUnsafeTlas {
+        blas: Vec<crate::ray_tracing::TraceBlasBuildEntry>,
+        tlas: Vec<crate::ray_tracing::TlasBuildEntry>,
+    },
+    BuildAccelerationStructures {
+        blas: Vec<crate::ray_tracing::TraceBlasBuildEntry>,
+        tlas: Vec<crate::ray_tracing::TraceTlasPackage>,
+    },
 }
 
 #[cfg(feature = "trace")]
@@ -201,7 +220,8 @@ pub struct Trace {
 
 #[cfg(feature = "trace")]
 impl Trace {
-    pub fn new(path: &std::path::Path) -> Result<Self, std::io::Error> {
+    pub fn new(dir_path_name: &str) -> Result<Self, std::io::Error> {
+        let path = std::path::Path::new(dir_path_name);
         log::info!("Tracing into '{:?}'", path);
         let mut file = std::fs::File::create(path.join(FILE_NAME))?;
         file.write_all(b"[\n")?;

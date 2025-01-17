@@ -5,8 +5,6 @@
 //! hello-compute example does not such as mapping buffers
 //! and why use the async channels.
 
-use std::mem::size_of_val;
-
 const OVERFLOW: u32 = 0xffffffff;
 
 async fn run() {
@@ -180,12 +178,7 @@ impl WgpuContext {
             .unwrap();
 
         // Our shader, kindly compiled with Naga.
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!(
-                "shader.wgsl"
-            ))),
-        });
+        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
         // This is where the GPU will read from and write to.
         let storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {

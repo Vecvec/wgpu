@@ -1,6 +1,3 @@
-use std::{sync::Arc, thread};
-
-use crate::context::ObjectId;
 use crate::*;
 
 /// Pre-prepared reusable bundle of GPU operations.
@@ -12,33 +9,14 @@ use crate::*;
 /// using [`RenderPass::execute_bundles`].
 ///
 /// Corresponds to [WebGPU `GPURenderBundle`](https://gpuweb.github.io/gpuweb/#render-bundle).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RenderBundle {
-    pub(crate) context: Arc<C>,
-    pub(crate) id: ObjectId,
-    pub(crate) data: Box<Data>,
+    pub(crate) inner: dispatch::DispatchRenderBundle,
 }
 #[cfg(send_sync)]
 static_assertions::assert_impl_all!(RenderBundle: Send, Sync);
 
-impl RenderBundle {
-    /// Returns a globally-unique identifier for this `RenderBundle`.
-    ///
-    /// Calling this method multiple times on the same object will always return the same value.
-    /// The returned value is guaranteed to be different for all resources created from the same `Instance`.
-    pub fn global_id(&self) -> Id<Self> {
-        Id::new(self.id)
-    }
-}
-
-impl Drop for RenderBundle {
-    fn drop(&mut self) {
-        if !thread::panicking() {
-            self.context
-                .render_bundle_drop(&self.id, self.data.as_ref());
-        }
-    }
-}
+crate::cmp::impl_eq_ord_hash_proxy!(RenderBundle => .inner);
 
 /// Describes a [`RenderBundle`].
 ///

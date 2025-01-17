@@ -5,7 +5,7 @@
 //! * passing `wgpu::RenderPassTimestampWrites`/`wgpu::ComputePassTimestampWrites` during render/compute pass creation.
 //!     This writes timestamps for the beginning and end of a given pass.
 //!     (enabled with wgpu::Features::TIMESTAMP_QUERY)
-//! * `wgpu::CommandEncoder::write_timestamp` writes a between any commands recorded on an encoder.
+//! * `wgpu::CommandEncoder::write_timestamp` writes a timestamp between any commands recorded on an encoder.
 //!     (enabled with wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS)
 //! * `wgpu::RenderPass/ComputePass::write_timestamp` writes a timestamp within commands of a render pass.
 //!     Note that some GPU architectures do not support this.
@@ -47,7 +47,10 @@ impl QueryResults {
     // * compute end
     const NUM_QUERIES: u64 = 8;
 
-    #[allow(clippy::redundant_closure)] // False positive
+    #[expect(
+        clippy::redundant_closure,
+        reason = "false positive for `get_next_slot`, which needs to be used by reference"
+    )]
     fn from_raw_results(timestamps: Vec<u64>, timestamps_inside_passes: bool) -> Self {
         assert_eq!(timestamps.len(), Self::NUM_QUERIES as usize);
 
@@ -75,7 +78,6 @@ impl QueryResults {
         }
     }
 
-    #[cfg_attr(test, allow(unused))]
     fn print(&self, queue: &wgpu::Queue) {
         let period = queue.get_timestamp_period();
         let elapsed_us = |start, end: u64| end.wrapping_sub(start) as f64 * period as f64 / 1000.0;
@@ -123,13 +125,13 @@ impl Queries {
             }),
             resolve_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("query resolve buffer"),
-                size: std::mem::size_of::<u64>() as u64 * num_queries,
+                size: size_of::<u64>() as u64 * num_queries,
                 usage: wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::QUERY_RESOLVE,
                 mapped_at_creation: false,
             }),
             destination_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("query dest buffer"),
-                size: std::mem::size_of::<u64>() as u64 * num_queries,
+                size: size_of::<u64>() as u64 * num_queries,
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
                 mapped_at_creation: false,
             }),
@@ -164,7 +166,7 @@ impl Queries {
         let timestamps = {
             let timestamp_view = self
                 .destination_buffer
-                .slice(..(std::mem::size_of::<u64>() as wgpu::BufferAddress * self.num_queries))
+                .slice(..(size_of::<u64>() as wgpu::BufferAddress * self.num_queries))
                 .get_mapped_range();
             bytemuck::cast_slice(&timestamp_view).to_vec()
         };
@@ -175,16 +177,9 @@ impl Queries {
     }
 }
 
-#[cfg_attr(test, allow(unused))]
 async fn run() {
     // Instantiates instance of wgpu
-    let backends = wgpu::util::backend_bits_from_env().unwrap_or_default();
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends,
-        flags: wgpu::InstanceFlags::from_build_config().with_env(),
-        dx12_shader_compiler: wgpu::Dx12Compiler::default(),
-        gles_minor_version: wgpu::Gles3MinorVersion::default(),
-    });
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::from_env_or_default());
 
     // `request_adapter` instantiates the general connection to the GPU
     let adapter = instance
@@ -225,7 +220,7 @@ async fn run() {
 
     let queries = submit_render_and_compute_pass_with_queries(&device, &queue);
     let raw_results = queries.wait_for_results(&device);
-    println!("Raw timestamp buffer contents: {:?}", raw_results);
+    println!("Raw timestamp buffer contents: {raw_results:?}");
     QueryResults::from_raw_results(raw_results, timestamps_inside_passes).print(&queue);
 }
 
@@ -237,10 +232,7 @@ fn submit_render_and_compute_pass_with_queries(
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
     let mut queries = Queries::new(device, QueryResults::NUM_QUERIES);
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("shader.wgsl"))),
-    });
+    let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
     if device
         .features()

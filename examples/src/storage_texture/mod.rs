@@ -42,10 +42,7 @@ async fn run(_path: Option<String>) {
         .await
         .unwrap();
 
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!("shader.wgsl"))),
-    });
+    let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
     let storage_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: None,
@@ -64,7 +61,7 @@ async fn run(_path: Option<String>) {
     let storage_texture_view = storage_texture.create_view(&wgpu::TextureViewDescriptor::default());
     let output_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
-        size: std::mem::size_of_val(&texture_data[..]) as u64,
+        size: size_of_val(&texture_data[..]) as u64,
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     });
@@ -120,15 +117,15 @@ async fn run(_path: Option<String>) {
         compute_pass.dispatch_workgroups(TEXTURE_DIMS.0 as u32, TEXTURE_DIMS.1 as u32, 1);
     }
     command_encoder.copy_texture_to_buffer(
-        wgpu::ImageCopyTexture {
+        wgpu::TexelCopyTextureInfo {
             texture: &storage_texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        wgpu::ImageCopyBuffer {
+        wgpu::TexelCopyBufferInfo {
             buffer: &output_staging_buffer,
-            layout: wgpu::ImageDataLayout {
+            layout: wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 // This needs to be padded to 256.
                 bytes_per_row: Some((TEXTURE_DIMS.0 * 4) as u32),

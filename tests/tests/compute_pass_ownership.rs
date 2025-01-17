@@ -253,7 +253,7 @@ fn resource_setup(ctx: &TestingContext) -> ResourceSetup {
             source: wgpu::ShaderSource::Wgsl(SHADER_SRC.into()),
         });
 
-    let buffer_size = 4 * std::mem::size_of::<f32>() as u64;
+    let buffer_size = 4 * size_of::<f32>() as u64;
 
     let bgl = ctx
         .device

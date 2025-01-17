@@ -18,6 +18,8 @@ void fb1_(
         }
         loop_init = false;
         continue;
+#define LOOP_IS_BOUNDED { volatile bool unpredictable_break_from_loop = false; if (unpredictable_break_from_loop) break; }
+        LOOP_IS_BOUNDED
     }
     return;
 }

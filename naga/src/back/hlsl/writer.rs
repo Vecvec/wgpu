@@ -8,8 +8,8 @@ use super::{
 };
 use crate::{
     back::{self, Baked},
-    proc::{self, NameKey},
-    valid, Handle, Module, RayTracingFunction, Scalar, ScalarKind, ShaderStage, TypeInner,
+    proc::{self, index, ExpressionKindTracker, NameKey},
+    valid, Handle, Module, RayTracingFunction, RayQueryFunction, Scalar, ScalarKind, ShaderStage, TypeInner,
 };
 use std::{fmt, mem};
 
@@ -104,6 +104,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             entry_point_io: Vec::new(),
             named_expressions: crate::NamedExpressions::default(),
             wrapped: super::Wrapped::default(),
+            written_committed_intersection: false,
+            written_candidate_intersection: false,
             continue_ctx: back::continue_forward::ContinueCtx::default(),
             temp_access_chain: Vec::new(),
             need_bake_expressions: Default::default(),
@@ -123,6 +125,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         self.entry_point_io.clear();
         self.named_expressions.clear();
         self.wrapped.clear();
+        self.written_committed_intersection = false;
+        self.written_candidate_intersection = false;
         self.continue_ctx.clear();
         self.need_bake_expressions.clear();
     }
@@ -346,6 +350,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 info,
                 expressions: &function.expressions,
                 named_expressions: &function.named_expressions,
+                expr_kind_tracker: ExpressionKindTracker::from_arena(&function.expressions),
             };
             let name = self.names[&NameKey::Function(handle)].clone();
 
@@ -386,6 +391,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 info,
                 expressions: &ep.function.expressions,
                 named_expressions: &ep.function.named_expressions,
+                expr_kind_tracker: ExpressionKindTracker::from_arena(&ep.function.expressions),
             };
 
             self.write_wrapped_functions(module, &ctx)?;
@@ -967,7 +973,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         let constant = &module.constants[handle];
         self.write_type(module, constant.ty)?;
         let name = &self.names[&NameKey::Constant(handle)];
-        write!(self.out, " {}", name)?;
+        write!(self.out, " {name}")?;
         // Write size for array type
         if let TypeInner::Array { base, size, .. } = module.types[constant.ty].inner {
             self.write_array_size(module, base, size)?;
@@ -990,6 +996,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             crate::ArraySize::Constant(size) => {
                 write!(self.out, "{size}")?;
             }
+            crate::ArraySize::Pending(_) => unreachable!(),
             crate::ArraySize::Dynamic => unreachable!(),
         }
 
@@ -1229,6 +1236,10 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             TypeInner::AccelerationStructure => {
                 write!(self.out, "RaytracingAccelerationStructure")?;
             }
+            TypeInner::RayQuery => {
+                // these are constant flags, there are dynamic flags also but constant flags are not supported by naga
+                write!(self.out, "RayQuery<RAY_FLAG_NONE>")?;
+            }
             TypeInner::Pointer {
                 base,
                 space: crate::AddressSpace::RayTracing,
@@ -1393,15 +1404,20 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 self.write_array_size(module, base, size)?;
             }
 
-            write!(self.out, " = ")?;
-            // Write the local initializer if needed
-            if let Some(init) = local.init {
-                self.write_expr(module, init, func_ctx)?;
-            } else {
-                // Zero initialize local variables
-                self.write_default_init(module, local.ty)?;
+            match module.types[local.ty].inner {
+                // from https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#tracerayinline-example-1 it seems that ray queries shouldn't be zeroed
+                TypeInner::RayQuery => {}
+                _ => {
+                    write!(self.out, " = ")?;
+                    // Write the local initializer if needed
+                    if let Some(init) = local.init {
+                        self.write_expr(module, init, func_ctx)?;
+                    } else {
+                        // Zero initialize local variables
+                        self.write_default_init(module, local.ty)?;
+                    }
+                }
             }
-
             // Finish the local with `;` and add a newline (only for readability)
             writeln!(self.out, ";")?
         }
@@ -2228,6 +2244,32 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
 
                 writeln!(self.out, ");")?;
             }
+            Statement::ImageAtomic {
+                image,
+                coordinate,
+                array_index,
+                fun,
+                value,
+            } => {
+                write!(self.out, "{level}")?;
+
+                let fun_str = fun.to_hlsl_suffix();
+                write!(self.out, "Interlocked{fun_str}(")?;
+                self.write_expr(module, image, func_ctx)?;
+                write!(self.out, "[")?;
+                self.write_texture_coordinates(
+                    "int",
+                    coordinate,
+                    array_index,
+                    None,
+                    module,
+                    func_ctx,
+                )?;
+                write!(self.out, "],")?;
+
+                self.write_expr(module, value, func_ctx)?;
+                writeln!(self.out, ");")?;
+            }
             Statement::WorkGroupUniformLoad { pointer, result } => {
                 self.write_barrier(crate::Barrier::WORK_GROUP, level)?;
                 write!(self.out, "{level}")?;
@@ -2242,7 +2284,37 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             } => {
                 self.write_switch(module, func_ctx, level, selector, cases)?;
             }
-            Statement::RayQuery { .. } => unreachable!(),
+            Statement::RayQuery { query, ref fun } => match *fun {
+                RayQueryFunction::Initialize {
+                    acceleration_structure,
+                    descriptor,
+                } => {
+                    write!(self.out, "{level}")?;
+                    self.write_expr(module, query, func_ctx)?;
+                    write!(self.out, ".TraceRayInline(")?;
+                    self.write_expr(module, acceleration_structure, func_ctx)?;
+                    write!(self.out, ", ")?;
+                    self.write_expr(module, descriptor, func_ctx)?;
+                    write!(self.out, ".flags, ")?;
+                    self.write_expr(module, descriptor, func_ctx)?;
+                    write!(self.out, ".cull_mask, ")?;
+                    write!(self.out, "RayDescFromRayDesc_(")?;
+                    self.write_expr(module, descriptor, func_ctx)?;
+                    writeln!(self.out, "));")?;
+                }
+                RayQueryFunction::Proceed { result } => {
+                    write!(self.out, "{level}")?;
+                    let name = Baked(result).to_string();
+                    write!(self.out, "const bool {name} = ")?;
+                    self.named_expressions.insert(result, name);
+                    self.write_expr(module, query, func_ctx)?;
+                    writeln!(self.out, ".Proceed();")?;
+                }
+                RayQueryFunction::Terminate => {
+                    self.write_expr(module, query, func_ctx)?;
+                    writeln!(self.out, ".Abort();")?;
+                }
+            },
             Statement::RayTracing { ref fun } => match *fun {
                 RayTracingFunction::TraceRay {
                     ref descriptor,
@@ -2452,11 +2524,11 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 // decimal part even it's zero
                 crate::Literal::F64(value) => write!(self.out, "{value:?}L")?,
                 crate::Literal::F32(value) => write!(self.out, "{value:?}")?,
-                crate::Literal::U32(value) => write!(self.out, "{}u", value)?,
-                crate::Literal::I32(value) => write!(self.out, "{}", value)?,
-                crate::Literal::U64(value) => write!(self.out, "{}uL", value)?,
-                crate::Literal::I64(value) => write!(self.out, "{}L", value)?,
-                crate::Literal::Bool(value) => write!(self.out, "{}", value)?,
+                crate::Literal::U32(value) => write!(self.out, "{value}u")?,
+                crate::Literal::I32(value) => write!(self.out, "{value}")?,
+                crate::Literal::U64(value) => write!(self.out, "{value}uL")?,
+                crate::Literal::I64(value) => write!(self.out, "{value}L")?,
+                crate::Literal::Bool(value) => write!(self.out, "{value}")?,
                 crate::Literal::AbstractInt(_) | crate::Literal::AbstractFloat(_) => {
                     return Err(Error::Custom(
                         "Abstract types should not appear in IR presented to backends".into(),
@@ -2656,24 +2728,67 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
 
                     let resolved = func_ctx.resolve_type(base, &module.types);
 
-                    let non_uniform_qualifier = match *resolved {
+                    let (indexing_binding_array, non_uniform_qualifier) = match *resolved {
                         TypeInner::BindingArray { .. } => {
                             let uniformity = &func_ctx.info[index].uniformity;
 
-                            uniformity.non_uniform_result.is_some()
+                            (true, uniformity.non_uniform_result.is_some())
                         }
-                        _ => false,
+                        _ => (false, false),
                     };
 
                     self.write_expr(module, base, func_ctx)?;
                     write!(self.out, "[")?;
-                    if non_uniform_qualifier {
-                        write!(self.out, "NonUniformResourceIndex(")?;
-                    }
-                    self.write_expr(module, index, func_ctx)?;
-                    if non_uniform_qualifier {
+
+                    let needs_bound_check = self.options.restrict_indexing
+                        && !indexing_binding_array
+                        && match resolved.pointer_space() {
+                            Some(
+                                crate::AddressSpace::Function
+                                | crate::AddressSpace::Private
+                                | crate::AddressSpace::WorkGroup
+                                | crate::AddressSpace::PushConstant,
+                            )
+                            | None => true,
+                            Some(crate::AddressSpace::Uniform) => false, // TODO: needs checks for dynamic uniform buffers, see https://github.com/gfx-rs/wgpu/issues/4483
+                            Some(
+                                crate::AddressSpace::Handle | crate::AddressSpace::Storage { .. },
+                            ) => unreachable!(),
+                        };
+                    // Decide whether this index needs to be clamped to fall within range.
+                    let restriction_needed = if needs_bound_check {
+                        index::access_needs_check(
+                            base,
+                            index::GuardedIndex::Expression(index),
+                            module,
+                            func_ctx.expressions,
+                            func_ctx.info,
+                        )
+                    } else {
+                        None
+                    };
+                    if let Some(limit) = restriction_needed {
+                        write!(self.out, "min(uint(")?;
+                        self.write_expr(module, index, func_ctx)?;
+                        write!(self.out, "), ")?;
+                        match limit {
+                            index::IndexableLength::Known(limit) => {
+                                write!(self.out, "{}u", limit - 1)?;
+                            }
+                            index::IndexableLength::Pending => unreachable!(),
+                            index::IndexableLength::Dynamic => unreachable!(),
+                        }
                         write!(self.out, ")")?;
+                    } else {
+                        if non_uniform_qualifier {
+                            write!(self.out, "NonUniformResourceIndex(")?;
+                        }
+                        self.write_expr(module, index, func_ctx)?;
+                        if non_uniform_qualifier {
+                            write!(self.out, ")")?;
+                        }
                     }
+
                     write!(self.out, "]")?;
                 }
             }
@@ -3063,6 +3178,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     Unpack4x8unorm,
                     Unpack4xI8,
                     Unpack4xU8,
+                    QuantizeToF16,
                     Regular(&'static str),
                     MissingIntOverload(&'static str),
                     MissingIntReturnType(&'static str),
@@ -3129,6 +3245,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     //Mf::Inverse =>,
                     Mf::Transpose => Function::Regular("transpose"),
                     Mf::Determinant => Function::Regular("determinant"),
+                    Mf::QuantizeToF16 => Function::QuantizeToF16,
                     // bits
                     Mf::CountTrailingZeros => Function::CountTrailingZeros,
                     Mf::CountLeadingZeros => Function::CountLeadingZeros,
@@ -3317,6 +3434,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                         write!(self.out, " >> 24) / {scale}.0)")?;
                     }
                     fun @ (Function::Unpack4xI8 | Function::Unpack4xU8) => {
+                        write!(self.out, "(")?;
                         if matches!(fun, Function::Unpack4xU8) {
                             write!(self.out, "u")?;
                         }
@@ -3328,7 +3446,12 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                         self.write_expr(module, arg, func_ctx)?;
                         write!(self.out, " >> 16, ")?;
                         self.write_expr(module, arg, func_ctx)?;
-                        write!(self.out, " >> 24) << 24 >> 24")?;
+                        write!(self.out, " >> 24) << 24 >> 24)")?;
+                    }
+                    Function::QuantizeToF16 => {
+                        write!(self.out, "f16tof32(f32tof16(")?;
+                        self.write_expr(module, arg, func_ctx)?;
+                        write!(self.out, "))")?;
                     }
                     Function::Regular(fun_name) => {
                         write!(self.out, "{fun_name}(")?;
@@ -3599,9 +3722,16 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 self.write_expr(module, reject, func_ctx)?;
                 write!(self.out, ")")?
             }
-            // Not supported yet
-            Expression::RayQueryGetIntersection { .. } => {
-                unreachable!()
+            Expression::RayQueryGetIntersection { query, committed } => {
+                if committed {
+                    write!(self.out, "GetCommittedIntersection(")?;
+                    self.write_expr(module, query, func_ctx)?;
+                    write!(self.out, ")")?;
+                } else {
+                    write!(self.out, "GetCandidateIntersection(")?;
+                    self.write_expr(module, query, func_ctx)?;
+                    write!(self.out, ")")?;
+                }
             }
             // Nothing to do here, since call expression already cached
             Expression::CallResult(_)

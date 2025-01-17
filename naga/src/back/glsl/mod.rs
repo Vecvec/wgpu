@@ -47,7 +47,7 @@ pub use features::Features;
 
 use crate::{
     back::{self, Baked},
-    proc::{self, NameKey},
+    proc::{self, ExpressionKindTracker, NameKey},
     valid, Handle, ShaderStage, TypeInner,
 };
 use features::FeaturesManager;
@@ -239,7 +239,7 @@ bitflags::bitflags! {
         /// additional functions on shadows and arrays of shadows.
         const TEXTURE_SHADOW_LOD = 0x2;
         /// Supports ARB_shader_draw_parameters on the host, which provides
-        /// support for `gl_BaseInstanceARB`, `gl_BaseVertexARB`, and `gl_DrawIDARB`.
+        /// support for `gl_BaseInstanceARB`, `gl_BaseVertexARB`, `gl_DrawIDARB`, and `gl_DrawID`.
         const DRAW_PARAMETERS = 0x4;
         /// Include unused global variables, constants and functions. By default the output will exclude
         /// global variables that are not used in the specified entrypoint (including indirect use),
@@ -259,6 +259,7 @@ bitflags::bitflags! {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize))]
 #[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(feature = "deserialize", serde(default))]
 pub struct Options {
     /// The GLSL version to be used.
     pub version: Version,
@@ -501,6 +502,9 @@ pub enum Error {
     Custom(String),
     #[error("overrides should not be present at this stage")]
     Override,
+    /// [`crate::Sampling::First`] is unsupported.
+    #[error("`{:?}` sampling is unsupported", crate::Sampling::First)]
+    FirstSamplingNotSupported,
 }
 
 /// Binary operation with a different logic on the GLSL side.
@@ -746,14 +750,17 @@ impl<'a, W: Write> Writer<'a, W> {
         // Write functions to create special types.
         for (type_key, struct_ty) in self.module.special_types.predeclared_types.iter() {
             match type_key {
-                &crate::PredeclaredType::ModfResult { size, width }
-                | &crate::PredeclaredType::FrexpResult { size, width } => {
+                &crate::PredeclaredType::ModfResult { size, scalar }
+                | &crate::PredeclaredType::FrexpResult { size, scalar } => {
                     let arg_type_name_owner;
                     let arg_type_name = if let Some(size) = size {
-                        arg_type_name_owner =
-                            format!("{}vec{}", if width == 8 { "d" } else { "" }, size as u8);
+                        arg_type_name_owner = format!(
+                            "{}vec{}",
+                            if scalar.width == 8 { "d" } else { "" },
+                            size as u8
+                        );
                         &arg_type_name_owner
-                    } else if width == 8 {
+                    } else if scalar.width == 8 {
                         "double"
                     } else {
                         "float"
@@ -977,6 +984,7 @@ impl<'a, W: Write> Writer<'a, W> {
             crate::ArraySize::Constant(size) => {
                 write!(self.out, "{size}")?;
             }
+            crate::ArraySize::Pending(_) => unreachable!(),
             crate::ArraySize::Dynamic => (),
         }
 
@@ -1095,12 +1103,16 @@ impl<'a, W: Write> Writer<'a, W> {
         // - Array - used if it's an image array
         // - Shadow - used if it's a depth image
         use crate::ImageClass as Ic;
-
-        let (base, kind, ms, comparison) = match class {
-            Ic::Sampled { kind, multi: true } => ("sampler", kind, "MS", ""),
-            Ic::Sampled { kind, multi: false } => ("sampler", kind, "", ""),
-            Ic::Depth { multi: true } => ("sampler", crate::ScalarKind::Float, "MS", ""),
-            Ic::Depth { multi: false } => ("sampler", crate::ScalarKind::Float, "", "Shadow"),
+        use crate::Scalar as S;
+        let float = S {
+            kind: crate::ScalarKind::Float,
+            width: 4,
+        };
+        let (base, scalar, ms, comparison) = match class {
+            Ic::Sampled { kind, multi: true } => ("sampler", S { kind, width: 4 }, "MS", ""),
+            Ic::Sampled { kind, multi: false } => ("sampler", S { kind, width: 4 }, "", ""),
+            Ic::Depth { multi: true } => ("sampler", float, "MS", ""),
+            Ic::Depth { multi: false } => ("sampler", float, "", "Shadow"),
             Ic::Storage { format, .. } => ("image", format.into(), "", ""),
         };
 
@@ -1114,7 +1126,7 @@ impl<'a, W: Write> Writer<'a, W> {
             self.out,
             "{}{}{}{}{}{}{}",
             precision,
-            glsl_scalar(crate::Scalar { kind, width: 4 })?.prefix,
+            glsl_scalar(scalar)?.prefix,
             base,
             glsl_dimension(dim),
             ms,
@@ -1329,7 +1341,8 @@ impl<'a, W: Write> Writer<'a, W> {
                     crate::MathFunction::Pack4xI8
                     | crate::MathFunction::Pack4xU8
                     | crate::MathFunction::Unpack4xI8
-                    | crate::MathFunction::Unpack4xU8 => {
+                    | crate::MathFunction::Unpack4xU8
+                    | crate::MathFunction::QuantizeToF16 => {
                         self.need_bake_expressions.insert(arg);
                     }
                     crate::MathFunction::ExtractBits => {
@@ -1543,7 +1556,7 @@ impl<'a, W: Write> Writer<'a, W> {
         // here, regardless of the version.
         if let Some(sampling) = sampling {
             if emit_interpolation_and_auxiliary {
-                if let Some(qualifier) = glsl_sampling(sampling) {
+                if let Some(qualifier) = glsl_sampling(sampling)? {
                     write!(self.out, "{qualifier} ")?;
                 }
             }
@@ -1593,6 +1606,7 @@ impl<'a, W: Write> Writer<'a, W> {
             info,
             expressions: &func.expressions,
             named_expressions: &func.named_expressions,
+            expr_kind_tracker: ExpressionKindTracker::from_arena(&func.expressions),
         };
 
         self.named_expressions.clear();
@@ -2470,6 +2484,17 @@ impl<'a, W: Write> Writer<'a, W> {
                 self.write_expr(value, ctx)?;
                 writeln!(self.out, ");")?;
             }
+            // Stores a value into an image.
+            Statement::ImageAtomic {
+                image,
+                coordinate,
+                array_index,
+                fun,
+                value,
+            } => {
+                write!(self.out, "{level}")?;
+                self.write_image_atomic(ctx, image, coordinate, array_index, fun, value)?
+            }
             Statement::RayQuery { .. } | Statement::RayTracing { .. } => unreachable!(),
             Statement::SubgroupBallot { result, predicate } => {
                 write!(self.out, "{level}")?;
@@ -2650,15 +2675,15 @@ impl<'a, W: Write> Writer<'a, W> {
                 match literal {
                     // Floats are written using `Debug` instead of `Display` because it always appends the
                     // decimal part even it's zero which is needed for a valid glsl float constant
-                    crate::Literal::F64(value) => write!(self.out, "{:?}LF", value)?,
-                    crate::Literal::F32(value) => write!(self.out, "{:?}", value)?,
+                    crate::Literal::F64(value) => write!(self.out, "{value:?}LF")?,
+                    crate::Literal::F32(value) => write!(self.out, "{value:?}")?,
                     // Unsigned integers need a `u` at the end
                     //
                     // While `core` doesn't necessarily need it, it's allowed and since `es` needs it we
                     // always write it as the extra branch wouldn't have any benefit in readability
-                    crate::Literal::U32(value) => write!(self.out, "{}u", value)?,
-                    crate::Literal::I32(value) => write!(self.out, "{}", value)?,
-                    crate::Literal::Bool(value) => write!(self.out, "{}", value)?,
+                    crate::Literal::U32(value) => write!(self.out, "{value}u")?,
+                    crate::Literal::I32(value) => write!(self.out, "{value}")?,
+                    crate::Literal::Bool(value) => write!(self.out, "{value}")?,
                     crate::Literal::I64(_) => {
                         return Err(Error::Custom("GLSL has no 64-bit integer type".into()));
                     }
@@ -3096,7 +3121,7 @@ impl<'a, W: Write> Writer<'a, W> {
                         self.write_expr(image, ctx)?;
                         // All textureSize calls requires an lod argument
                         // except for multisampled samplers
-                        if class.is_multisampled() {
+                        if !class.is_multisampled() {
                             write!(self.out, ", 0")?;
                         }
                         write!(self.out, ")")?;
@@ -3496,6 +3521,48 @@ impl<'a, W: Write> Writer<'a, W> {
                     Mf::Inverse => "inverse",
                     Mf::Transpose => "transpose",
                     Mf::Determinant => "determinant",
+                    Mf::QuantizeToF16 => match *ctx.resolve_type(arg, &self.module.types) {
+                        TypeInner::Scalar { .. } => {
+                            write!(self.out, "unpackHalf2x16(packHalf2x16(vec2(")?;
+                            self.write_expr(arg, ctx)?;
+                            write!(self.out, "))).x")?;
+                            return Ok(());
+                        }
+                        TypeInner::Vector {
+                            size: crate::VectorSize::Bi,
+                            ..
+                        } => {
+                            write!(self.out, "unpackHalf2x16(packHalf2x16(")?;
+                            self.write_expr(arg, ctx)?;
+                            write!(self.out, "))")?;
+                            return Ok(());
+                        }
+                        TypeInner::Vector {
+                            size: crate::VectorSize::Tri,
+                            ..
+                        } => {
+                            write!(self.out, "vec3(unpackHalf2x16(packHalf2x16(")?;
+                            self.write_expr(arg, ctx)?;
+                            write!(self.out, ".xy)), unpackHalf2x16(packHalf2x16(")?;
+                            self.write_expr(arg, ctx)?;
+                            write!(self.out, ".zz)).x)")?;
+                            return Ok(());
+                        }
+                        TypeInner::Vector {
+                            size: crate::VectorSize::Quad,
+                            ..
+                        } => {
+                            write!(self.out, "vec4(unpackHalf2x16(packHalf2x16(")?;
+                            self.write_expr(arg, ctx)?;
+                            write!(self.out, ".xy)), unpackHalf2x16(packHalf2x16(")?;
+                            self.write_expr(arg, ctx)?;
+                            write!(self.out, ".zw)))")?;
+                            return Ok(());
+                        }
+                        _ => unreachable!(
+                            "Correct TypeInner for QuantizeToF16 should be already validated"
+                        ),
+                    },
                     // bits
                     Mf::CountTrailingZeros => {
                         match *ctx.resolve_type(arg, &self.module.types) {
@@ -4055,7 +4122,7 @@ impl<'a, W: Write> Writer<'a, W> {
     ) -> Result<(), Error> {
         use crate::ImageDimension as IDim;
 
-        // NOTE: openGL requires that `imageStore`s have no effets when the texel is invalid
+        // NOTE: openGL requires that `imageStore`s have no effects when the texel is invalid
         // so we don't need to generate bounds checks (OpenGL 4.2 Core §3.9.20)
 
         // This will only panic if the module is invalid
@@ -4087,6 +4154,56 @@ impl<'a, W: Write> Writer<'a, W> {
         write!(self.out, ", ")?;
         self.write_expr(value, ctx)?;
         // End the call to `imageStore` and the statement.
+        writeln!(self.out, ");")?;
+
+        Ok(())
+    }
+
+    /// Helper method to write the `ImageAtomic` statement
+    fn write_image_atomic(
+        &mut self,
+        ctx: &back::FunctionCtx,
+        image: Handle<crate::Expression>,
+        coordinate: Handle<crate::Expression>,
+        array_index: Option<Handle<crate::Expression>>,
+        fun: crate::AtomicFunction,
+        value: Handle<crate::Expression>,
+    ) -> Result<(), Error> {
+        use crate::ImageDimension as IDim;
+
+        // NOTE: openGL requires that `imageAtomic`s have no effects when the texel is invalid
+        // so we don't need to generate bounds checks (OpenGL 4.2 Core §3.9.20)
+
+        // This will only panic if the module is invalid
+        let dim = match *ctx.resolve_type(image, &self.module.types) {
+            TypeInner::Image { dim, .. } => dim,
+            _ => unreachable!(),
+        };
+
+        // Begin our call to `imageAtomic`
+        let fun_str = fun.to_glsl();
+        write!(self.out, "imageAtomic{fun_str}(")?;
+        self.write_expr(image, ctx)?;
+        // Separate the image argument from the coordinates
+        write!(self.out, ", ")?;
+
+        // openGL es doesn't have 1D images so we need workaround it
+        let tex_1d_hack = dim == IDim::D1 && self.options.version.is_es();
+        // Write the coordinate vector
+        self.write_texture_coord(
+            ctx,
+            // Get the size of the coordinate vector
+            self.get_coordinate_vector_size(dim, false),
+            coordinate,
+            array_index,
+            tex_1d_hack,
+        )?;
+
+        // Separate the coordinate from the value to write and write the expression
+        // of the value to write.
+        write!(self.out, ", ")?;
+        self.write_expr(value, ctx)?;
+        // End the call to `imageAtomic` and the statement.
         writeln!(self.out, ");")?;
 
         Ok(())
@@ -4418,6 +4535,7 @@ impl<'a, W: Write> Writer<'a, W> {
                     .expect("Bad array size")
                 {
                     proc::IndexableLength::Known(count) => count,
+                    proc::IndexableLength::Pending => unreachable!(),
                     proc::IndexableLength::Dynamic => return Ok(()),
                 };
                 self.write_type(base)?;
@@ -4487,6 +4605,9 @@ impl<'a, W: Write> Writer<'a, W> {
     /// they can only be used to query information about the resource which isn't what
     /// we want here so when storage access is both `LOAD` and `STORE` add no modifiers
     fn write_storage_access(&mut self, storage_access: crate::StorageAccess) -> BackendResult {
+        if storage_access.contains(crate::StorageAccess::ATOMIC) {
+            return Ok(());
+        }
         if !storage_access.contains(crate::StorageAccess::STORE) {
             write!(self.out, "readonly ")?;
         }
@@ -4621,7 +4742,7 @@ impl<'a, W: Write> Writer<'a, W> {
 
                 for i in 0..count.get() {
                     // Add the array accessor and recurse.
-                    segments.push(format!("[{}]", i));
+                    segments.push(format!("[{i}]"));
                     self.collect_push_constant_items(base, segments, layouter, offset, items);
                     segments.pop();
                 }
@@ -4726,6 +4847,7 @@ const fn glsl_built_in(built_in: crate::BuiltIn, options: VaryingOptions) -> &'s
         }
         Bi::PointSize => "gl_PointSize",
         Bi::VertexIndex => "uint(gl_VertexID)",
+        Bi::DrawID => "gl_DrawID",
         // fragment
         Bi::FragDepth => "gl_FragDepth",
         Bi::PointCoord => "gl_PointCoord",
@@ -4799,14 +4921,15 @@ const fn glsl_interpolation(interpolation: crate::Interpolation) -> &'static str
 }
 
 /// Return the GLSL auxiliary qualifier for the given sampling value.
-const fn glsl_sampling(sampling: crate::Sampling) -> Option<&'static str> {
+const fn glsl_sampling(sampling: crate::Sampling) -> BackendResult<Option<&'static str>> {
     use crate::Sampling as S;
 
-    match sampling {
-        S::Center => None,
+    Ok(match sampling {
+        S::First => return Err(Error::FirstSamplingNotSupported),
+        S::Center | S::Either => None,
         S::Centroid => Some("centroid"),
         S::Sample => Some("sample"),
-    }
+    })
 }
 
 /// Helper function that returns the glsl dimension string of [`ImageDimension`](crate::ImageDimension)
@@ -4849,7 +4972,8 @@ fn glsl_storage_format(format: crate::StorageFormat) -> Result<&'static str, Err
         Sf::Rgba8Sint => "rgba8i",
         Sf::Rgb10a2Uint => "rgb10_a2ui",
         Sf::Rgb10a2Unorm => "rgb10_a2",
-        Sf::Rg11b10UFloat => "r11f_g11f_b10f",
+        Sf::Rg11b10Ufloat => "r11f_g11f_b10f",
+        Sf::R64Uint => "r64ui",
         Sf::Rg32Uint => "rg32ui",
         Sf::Rg32Sint => "rg32i",
         Sf::Rg32Float => "rg32f",

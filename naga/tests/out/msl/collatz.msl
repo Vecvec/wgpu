@@ -37,6 +37,8 @@ uint collatz_iterations(
             uint _e20 = i;
             i = _e20 + 1u;
         }
+#define LOOP_IS_BOUNDED { volatile bool unpredictable_break_from_loop = false; if (unpredictable_break_from_loop) break; }
+        LOOP_IS_BOUNDED
     }
     uint _e23 = i;
     return _e23;

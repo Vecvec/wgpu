@@ -13,6 +13,7 @@
 		fake_missing_bindings: false,
 		special_constants_binding: Some((space: 1, register: 0)),
 		zero_initialize_workgroup_memory: true,
+		restrict_indexing: true
 	),
 	wgsl: (
 		explicit_types: true,
@@ -27,7 +28,7 @@
 	),
 	msl_pipeline: (
 		allow_and_force_point_size: true,
-    vertex_pulling_transform: false,
-    vertex_buffer_mappings: [],
+		vertex_pulling_transform: false,
+		vertex_buffer_mappings: [],
 	),
 )

@@ -8,7 +8,9 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use glam::{Affine3A, Mat4, Vec3};
 use std::{
     borrow::{Borrow, Cow},
-    iter, mem, ptr,
+    iter,
+    mem::size_of,
+    ptr,
     time::Instant,
 };
 use winit::window::WindowButtons;
@@ -122,7 +124,12 @@ impl AccelerationStructureInstance {
         &mut self,
         shader_binding_table_record_offset: u32,
     ) {
-        debug_assert!(shader_binding_table_record_offset <= Self::MAX_U24, "shader_binding_table_record_offset uses more than 24 bits! {shader_binding_table_record_offset} > {}", Self::MAX_U24);
+        debug_assert!(
+            shader_binding_table_record_offset <= Self::MAX_U24,
+            "shader_binding_table_record_offset uses more than 24 bits! {} > {}",
+            shader_binding_table_record_offset,
+            Self::MAX_U24
+        );
         self.shader_binding_table_record_offset_and_flags = (shader_binding_table_record_offset
             & Self::LOW_24_MASK)
             | (self.shader_binding_table_record_offset_and_flags & !Self::LOW_24_MASK)
@@ -149,7 +156,9 @@ impl AccelerationStructureInstance {
         );
         debug_assert!(
             shader_binding_table_record_offset <= Self::MAX_U24,
-            "shader_binding_table_record_offset uses more than 24 bits! {shader_binding_table_record_offset} > {}", Self::MAX_U24
+            "shader_binding_table_record_offset uses more than 24 bits! {} > {}",
+            shader_binding_table_record_offset,
+            Self::MAX_U24
         );
         AccelerationStructureInstance {
             transform: Self::affine_to_rows(transform),
@@ -203,7 +212,7 @@ struct Example<A: hal::Api> {
     uniform_buffer: A::Buffer,
     pipeline_layout: A::PipelineLayout,
     vertices_buffer: A::Buffer,
-    indices_buffer: A::Buffer,
+    indices_buffer: Option<A::Buffer>,
     texture: A::Texture,
     instances: [AccelerationStructureInstance; 3],
     instances_buffer: A::Buffer,
@@ -215,12 +224,24 @@ struct Example<A: hal::Api> {
 
 impl<A: hal::Api> Example<A> {
     fn init(window: &winit::window::Window) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut index_buffer = false;
+
+        for arg in std::env::args() {
+            if arg == "index_buffer" {
+                index_buffer = true;
+            }
+        }
+
+        if index_buffer {
+            log::info!("using index buffer")
+        }
+
         let instance_desc = hal::InstanceDescriptor {
             name: "example",
             flags: wgt::InstanceFlags::default(),
-            dx12_shader_compiler: wgt::Dx12Compiler::Dxc {
-                dxil_path: None,
-                dxc_path: None,
+            dx12_shader_compiler: wgt::Dx12Compiler::DynamicDxc {
+                dxc_path: "dxcompiler.dll".to_string(),
+                dxil_path: "dxil.dll".to_string(),
             },
             gles_minor_version: wgt::Gles3MinorVersion::default(),
         };
@@ -263,7 +284,7 @@ impl<A: hal::Api> Example<A> {
         dbg!(&surface_caps.formats);
         let surface_format = if surface_caps
             .formats
-            .contains(&wgt::TextureFormat::Rgba8Snorm)
+            .contains(&wgt::TextureFormat::Rgba8Unorm)
         {
             wgt::TextureFormat::Rgba8Unorm
         } else {
@@ -304,7 +325,7 @@ impl<A: hal::Api> Example<A> {
                     ty: wgt::BindingType::Buffer {
                         ty: wgt::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: wgt::BufferSize::new(mem::size_of::<Uniforms>() as _),
+                        min_binding_size: wgt::BufferSize::new(size_of::<Uniforms>() as _),
                     },
                     count: None,
                 },
@@ -350,7 +371,7 @@ impl<A: hal::Api> Example<A> {
         };
         let shader_desc = hal::ShaderModuleDescriptor {
             label: None,
-            runtime_checks: false,
+            runtime_checks: wgt::ShaderRuntimeChecks::checked(),
         };
         let shader_module = unsafe {
             device
@@ -418,43 +439,52 @@ impl<A: hal::Api> Example<A> {
             vertices_buffer
         };
 
-        let indices_buffer = unsafe {
-            let indices_buffer = device
-                .create_buffer(&hal::BufferDescriptor {
-                    label: Some("indices buffer"),
-                    size: indices_size_in_bytes as u64,
-                    usage: hal::BufferUses::MAP_WRITE
-                        | hal::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT,
-                    memory_flags: hal::MemoryFlags::TRANSIENT | hal::MemoryFlags::PREFER_COHERENT,
-                })
-                .unwrap();
+        let indices_buffer = if index_buffer {
+            unsafe {
+                let indices_buffer = device
+                    .create_buffer(&hal::BufferDescriptor {
+                        label: Some("indices buffer"),
+                        size: indices_size_in_bytes as u64,
+                        usage: hal::BufferUses::MAP_WRITE
+                            | hal::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT,
+                        memory_flags: hal::MemoryFlags::TRANSIENT
+                            | hal::MemoryFlags::PREFER_COHERENT,
+                    })
+                    .unwrap();
 
-            let mapping = device
-                .map_buffer(&indices_buffer, 0..indices_size_in_bytes as u64)
-                .unwrap();
-            ptr::copy_nonoverlapping(
-                indices.as_ptr() as *const u8,
-                mapping.ptr.as_ptr(),
-                indices_size_in_bytes,
-            );
-            device.unmap_buffer(&indices_buffer);
-            assert!(mapping.is_coherent);
+                let mapping = device
+                    .map_buffer(&indices_buffer, 0..indices_size_in_bytes as u64)
+                    .unwrap();
+                ptr::copy_nonoverlapping(
+                    indices.as_ptr() as *const u8,
+                    mapping.ptr.as_ptr(),
+                    indices_size_in_bytes,
+                );
+                device.unmap_buffer(&indices_buffer);
+                assert!(mapping.is_coherent);
 
-            indices_buffer
+                Some((indices_buffer, indices.len()))
+            }
+        } else {
+            None
         };
 
         let blas_triangles = vec![hal::AccelerationStructureTriangles {
             vertex_buffer: Some(&vertices_buffer),
             first_vertex: 0,
             vertex_format: wgt::VertexFormat::Float32x3,
-            vertex_count: vertices.len() as u32,
+            // each vertex is 3 floats, and floats are stored raw in the array
+            vertex_count: vertices.len() as u32 / 3,
             vertex_stride: 3 * 4,
-            indices: Some(hal::AccelerationStructureTriangleIndices {
-                buffer: Some(&indices_buffer),
-                format: wgt::IndexFormat::Uint32,
-                offset: 0,
-                count: indices.len() as u32,
+            indices: indices_buffer.as_ref().map(|(buf, len)| {
+                hal::AccelerationStructureTriangleIndices {
+                    buffer: Some(buf),
+                    format: wgt::IndexFormat::Uint32,
+                    offset: 0,
+                    count: *len as u32,
+                }
             }),
+
             transform: None,
             flags: hal::AccelerationStructureGeometryFlags::OPAQUE,
         }];
@@ -516,7 +546,7 @@ impl<A: hal::Api> Example<A> {
             }
         };
 
-        let uniforms_size = std::mem::size_of::<Uniforms>();
+        let uniforms_size = size_of::<Uniforms>();
 
         let uniform_buffer = unsafe {
             let uniform_buffer = device
@@ -657,8 +687,7 @@ impl<A: hal::Api> Example<A> {
             ),
         ];
 
-        let instances_buffer_size =
-            instances.len() * std::mem::size_of::<AccelerationStructureInstance>();
+        let instances_buffer_size = instances.len() * size_of::<AccelerationStructureInstance>();
 
         let instances_buffer = unsafe {
             let instances_buffer = device
@@ -703,8 +732,10 @@ impl<A: hal::Api> Example<A> {
 
         unsafe {
             cmd_encoder.place_acceleration_structure_barrier(hal::AccelerationStructureBarrier {
-                usage: hal::AccelerationStructureUses::empty()
-                    ..hal::AccelerationStructureUses::BUILD_OUTPUT,
+                usage: hal::StateTransition {
+                    from: hal::AccelerationStructureUses::empty(),
+                    to: hal::AccelerationStructureUses::BUILD_OUTPUT,
+                },
             });
 
             cmd_encoder.build_acceleration_structures(
@@ -722,14 +753,18 @@ impl<A: hal::Api> Example<A> {
 
             let scratch_buffer_barrier = hal::BufferBarrier {
                 buffer: &scratch_buffer,
-                usage: hal::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT
-                    ..hal::BufferUses::TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT,
+                usage: hal::StateTransition {
+                    from: hal::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT,
+                    to: hal::BufferUses::TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT,
+                },
             };
             cmd_encoder.transition_buffers(iter::once(scratch_buffer_barrier));
 
             cmd_encoder.place_acceleration_structure_barrier(hal::AccelerationStructureBarrier {
-                usage: hal::AccelerationStructureUses::BUILD_OUTPUT
-                    ..hal::AccelerationStructureUses::BUILD_INPUT,
+                usage: hal::StateTransition {
+                    from: hal::AccelerationStructureUses::BUILD_OUTPUT,
+                    to: hal::AccelerationStructureUses::BUILD_INPUT,
+                },
             });
 
             cmd_encoder.build_acceleration_structures(
@@ -746,14 +781,19 @@ impl<A: hal::Api> Example<A> {
             );
 
             cmd_encoder.place_acceleration_structure_barrier(hal::AccelerationStructureBarrier {
-                usage: hal::AccelerationStructureUses::BUILD_OUTPUT
-                    ..hal::AccelerationStructureUses::SHADER_INPUT,
+                usage: hal::StateTransition {
+                    from: hal::AccelerationStructureUses::BUILD_OUTPUT,
+                    to: hal::AccelerationStructureUses::SHADER_INPUT,
+                },
             });
 
             let texture_barrier = hal::TextureBarrier {
                 texture: &texture,
                 range: wgt::ImageSubresourceRange::default(),
-                usage: hal::TextureUses::UNINITIALIZED..hal::TextureUses::STORAGE_READ_WRITE,
+                usage: hal::StateTransition {
+                    from: hal::TextureUses::UNINITIALIZED,
+                    to: hal::TextureUses::STORAGE_READ_WRITE,
+                },
             };
 
             cmd_encoder.transition_textures(iter::once(texture_barrier));
@@ -799,7 +839,7 @@ impl<A: hal::Api> Example<A> {
             tlas,
             scratch_buffer,
             time: 0.0,
-            indices_buffer,
+            indices_buffer: indices_buffer.map(|(buf, _)| buf),
             vertices_buffer,
             uniform_buffer,
             texture_view,
@@ -824,11 +864,14 @@ impl<A: hal::Api> Example<A> {
         let target_barrier0 = hal::TextureBarrier {
             texture: surface_tex.borrow(),
             range: wgt::ImageSubresourceRange::default(),
-            usage: hal::TextureUses::UNINITIALIZED..hal::TextureUses::COPY_DST,
+            usage: hal::StateTransition {
+                from: hal::TextureUses::UNINITIALIZED,
+                to: hal::TextureUses::COPY_DST,
+            },
         };
 
         let instances_buffer_size =
-            self.instances.len() * std::mem::size_of::<AccelerationStructureInstance>();
+            self.instances.len() * size_of::<AccelerationStructureInstance>();
 
         let tlas_flags = hal::AccelerationStructureBuildFlags::PREFER_FAST_TRACE
             | hal::AccelerationStructureBuildFlags::ALLOW_UPDATE;
@@ -862,8 +905,10 @@ impl<A: hal::Api> Example<A> {
 
             ctx.encoder
                 .place_acceleration_structure_barrier(hal::AccelerationStructureBarrier {
-                    usage: hal::AccelerationStructureUses::SHADER_INPUT
-                        ..hal::AccelerationStructureUses::BUILD_INPUT,
+                    usage: hal::StateTransition {
+                        from: hal::AccelerationStructureUses::SHADER_INPUT,
+                        to: hal::AccelerationStructureUses::BUILD_INPUT,
+                    },
                 });
 
             ctx.encoder.build_acceleration_structures(
@@ -881,14 +926,18 @@ impl<A: hal::Api> Example<A> {
 
             ctx.encoder
                 .place_acceleration_structure_barrier(hal::AccelerationStructureBarrier {
-                    usage: hal::AccelerationStructureUses::BUILD_OUTPUT
-                        ..hal::AccelerationStructureUses::SHADER_INPUT,
+                    usage: hal::StateTransition {
+                        from: hal::AccelerationStructureUses::BUILD_OUTPUT,
+                        to: hal::AccelerationStructureUses::SHADER_INPUT,
+                    },
                 });
 
             let scratch_buffer_barrier = hal::BufferBarrier {
                 buffer: &self.scratch_buffer,
-                usage: hal::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT
-                    ..hal::BufferUses::TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT,
+                usage: hal::StateTransition {
+                    from: hal::BufferUses::BOTTOM_LEVEL_ACCELERATION_STRUCTURE_INPUT,
+                    to: hal::BufferUses::TOP_LEVEL_ACCELERATION_STRUCTURE_INPUT,
+                },
             };
             ctx.encoder
                 .transition_buffers(iter::once(scratch_buffer_barrier));
@@ -924,17 +973,26 @@ impl<A: hal::Api> Example<A> {
         let target_barrier1 = hal::TextureBarrier {
             texture: surface_tex.borrow(),
             range: wgt::ImageSubresourceRange::default(),
-            usage: hal::TextureUses::COPY_DST..hal::TextureUses::PRESENT,
+            usage: hal::StateTransition {
+                from: hal::TextureUses::COPY_DST,
+                to: hal::TextureUses::PRESENT,
+            },
         };
         let target_barrier2 = hal::TextureBarrier {
             texture: &self.texture,
             range: wgt::ImageSubresourceRange::default(),
-            usage: hal::TextureUses::STORAGE_READ_WRITE..hal::TextureUses::COPY_SRC,
+            usage: hal::StateTransition {
+                from: hal::TextureUses::STORAGE_READ_WRITE,
+                to: hal::TextureUses::COPY_SRC,
+            },
         };
         let target_barrier3 = hal::TextureBarrier {
             texture: &self.texture,
             range: wgt::ImageSubresourceRange::default(),
-            usage: hal::TextureUses::COPY_SRC..hal::TextureUses::STORAGE_READ_WRITE,
+            usage: hal::StateTransition {
+                from: hal::TextureUses::COPY_SRC,
+                to: hal::TextureUses::STORAGE_READ_WRITE,
+            },
         };
         unsafe {
             ctx.encoder.end_compute_pass();
@@ -1018,14 +1076,16 @@ impl<A: hal::Api> Example<A> {
 
             for mut ctx in self.contexts {
                 ctx.wait_and_clear(&self.device);
-                self.device.destroy_command_encoder(ctx.encoder);
+                drop(ctx.encoder);
                 self.device.destroy_fence(ctx.fence);
             }
 
             self.device.destroy_bind_group(self.bind_group);
             self.device.destroy_buffer(self.scratch_buffer);
             self.device.destroy_buffer(self.instances_buffer);
-            self.device.destroy_buffer(self.indices_buffer);
+            if let Some(buffer) = self.indices_buffer {
+                self.device.destroy_buffer(buffer);
+            }
             self.device.destroy_buffer(self.vertices_buffer);
             self.device.destroy_buffer(self.uniform_buffer);
             self.device.destroy_acceleration_structure(self.tlas);
@@ -1038,7 +1098,8 @@ impl<A: hal::Api> Example<A> {
             self.device.destroy_shader_module(self.shader_module);
 
             self.surface.unconfigure(&self.device);
-            self.device.exit(self.queue);
+            drop(self.queue);
+            drop(self.device);
             drop(self.surface);
             drop(self.adapter);
         }
@@ -1047,7 +1108,7 @@ impl<A: hal::Api> Example<A> {
 
 cfg_if::cfg_if! {
     // Apple + Metal
-    if #[cfg(all(any(target_os = "macos", target_os = "ios"), feature = "metal"))] {
+    if #[cfg(all(target_vendor = "apple", feature = "metal"))] {
         type Api = hal::api::Metal;
     }
     // Wasm + Vulkan

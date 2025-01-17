@@ -37,7 +37,7 @@ fn test_vertex_attr_array() {
     assert_eq!(attrs.len(), 2);
     assert_eq!(attrs[0].offset, 0);
     assert_eq!(attrs[0].shader_location, 0);
-    assert_eq!(attrs[1].offset, std::mem::size_of::<(f32, f32)>() as u64);
+    assert_eq!(attrs[1].offset, size_of::<(f32, f32)>() as u64);
     assert_eq!(attrs[1].shader_location, 3);
 }
 

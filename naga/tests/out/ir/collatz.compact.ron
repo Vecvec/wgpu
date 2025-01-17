@@ -249,6 +249,7 @@
                     value: Some(23),
                 ),
             ],
+            diagnostic_filter_leaf: None,
         ),
     ],
     entry_points: [
@@ -257,6 +258,7 @@
             stage: Compute,
             early_depth_test: None,
             workgroup_size: (1, 1, 1),
+            workgroup_size_overrides: None,
             function: (
                 name: Some("main"),
                 arguments: [
@@ -328,7 +330,10 @@
                         value: None,
                     ),
                 ],
+                diagnostic_filter_leaf: None,
             ),
         ),
     ],
+    diagnostic_filters: [],
+    diagnostic_filter_leaf: None,
 )

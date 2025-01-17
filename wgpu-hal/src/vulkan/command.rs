@@ -3,7 +3,11 @@ use super::conv;
 use arrayvec::ArrayVec;
 use ash::vk;
 
-use std::{mem, ops::Range, slice};
+use std::{
+    mem::{self, size_of},
+    ops::Range,
+    slice,
+};
 
 const ALLOCATION_GRANULARITY: u32 = 16;
 const DST_IMAGE_LAYOUT: vk::ImageLayout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
@@ -136,9 +140,9 @@ impl crate::CommandEncoder for super::CommandEncoder {
         vk_barriers.clear();
 
         for bar in barriers {
-            let (src_stage, src_access) = conv::map_buffer_usage_to_barrier(bar.usage.start);
+            let (src_stage, src_access) = conv::map_buffer_usage_to_barrier(bar.usage.from);
             src_stages |= src_stage;
-            let (dst_stage, dst_access) = conv::map_buffer_usage_to_barrier(bar.usage.end);
+            let (dst_stage, dst_access) = conv::map_buffer_usage_to_barrier(bar.usage.to);
             dst_stages |= dst_stage;
 
             vk_barriers.push(
@@ -180,11 +184,11 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 bar.texture.format,
                 &self.device.private_caps,
             );
-            let (src_stage, src_access) = conv::map_texture_usage_to_barrier(bar.usage.start);
-            let src_layout = conv::derive_image_layout(bar.usage.start, bar.texture.format);
+            let (src_stage, src_access) = conv::map_texture_usage_to_barrier(bar.usage.from);
+            let src_layout = conv::derive_image_layout(bar.usage.from, bar.texture.format);
             src_stages |= src_stage;
-            let (dst_stage, dst_access) = conv::map_texture_usage_to_barrier(bar.usage.end);
-            let dst_layout = conv::derive_image_layout(bar.usage.end, bar.texture.format);
+            let (dst_stage, dst_access) = conv::map_texture_usage_to_barrier(bar.usage.to);
+            let dst_layout = conv::derive_image_layout(bar.usage.to, bar.texture.format);
             dst_stages |= dst_stage;
 
             vk_barriers.push(
@@ -499,6 +503,9 @@ impl crate::CommandEncoder for super::CommandEncoder {
                     for triangles in in_geometries {
                         let mut triangle_data =
                             vk::AccelerationStructureGeometryTrianglesDataKHR::default()
+                                // IndexType::NONE_KHR is not set by default (due to being provided by VK_KHR_acceleration_structure) but unless there is an
+                                // index buffer we need to have IndexType::NONE_KHR as our index type.
+                                .index_type(vk::IndexType::NONE_KHR)
                                 .vertex_data(vk::DeviceOrHostAddressConstKHR {
                                     device_address: get_device_address(triangles.vertex_buffer),
                                 })
@@ -640,10 +647,14 @@ impl crate::CommandEncoder for super::CommandEncoder {
         &mut self,
         barrier: crate::AccelerationStructureBarrier,
     ) {
-        let (src_stage, src_access) =
-            conv::map_acceleration_structure_usage_to_barrier(barrier.usage.start);
-        let (dst_stage, dst_access) =
-            conv::map_acceleration_structure_usage_to_barrier(barrier.usage.end);
+        let (src_stage, src_access) = conv::map_acceleration_structure_usage_to_barrier(
+            barrier.usage.from,
+            self.device.features,
+        );
+        let (dst_stage, dst_access) = conv::map_acceleration_structure_usage_to_barrier(
+            barrier.usage.to,
+            self.device.features,
+        );
 
         unsafe {
             self.device.raw.cmd_pipeline_barrier(
@@ -1012,7 +1023,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 buffer.raw,
                 offset,
                 draw_count,
-                mem::size_of::<wgt::DrawIndirectArgs>() as u32,
+                size_of::<wgt::DrawIndirectArgs>() as u32,
             )
         };
     }
@@ -1028,7 +1039,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 buffer.raw,
                 offset,
                 draw_count,
-                mem::size_of::<wgt::DrawIndexedIndirectArgs>() as u32,
+                size_of::<wgt::DrawIndexedIndirectArgs>() as u32,
             )
         };
     }
@@ -1040,7 +1051,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
         count_offset: wgt::BufferAddress,
         max_count: u32,
     ) {
-        let stride = mem::size_of::<wgt::DrawIndirectArgs>() as u32;
+        let stride = size_of::<wgt::DrawIndirectArgs>() as u32;
         match self.device.extension_fns.draw_indirect_count {
             Some(ref t) => {
                 unsafe {
@@ -1066,7 +1077,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
         count_offset: wgt::BufferAddress,
         max_count: u32,
     ) {
-        let stride = mem::size_of::<wgt::DrawIndexedIndirectArgs>() as u32;
+        let stride = size_of::<wgt::DrawIndexedIndirectArgs>() as u32;
         match self.device.extension_fns.draw_indirect_count {
             Some(ref t) => {
                 unsafe {

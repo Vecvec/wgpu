@@ -1,6 +1,3 @@
-use std::{sync::Arc, thread};
-
-use crate::context::ObjectId;
 use crate::*;
 
 /// Handle to a compute pipeline.
@@ -9,42 +6,26 @@ use crate::*;
 /// It can be created with [`Device::create_compute_pipeline`].
 ///
 /// Corresponds to [WebGPU `GPUComputePipeline`](https://gpuweb.github.io/gpuweb/#compute-pipeline).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ComputePipeline {
-    pub(crate) context: Arc<C>,
-    pub(crate) id: ObjectId,
-    pub(crate) data: Box<Data>,
+    pub(crate) inner: dispatch::DispatchComputePipeline,
 }
 #[cfg(send_sync)]
 static_assertions::assert_impl_all!(ComputePipeline: Send, Sync);
 
+crate::cmp::impl_eq_ord_hash_proxy!(ComputePipeline => .inner);
+
 impl ComputePipeline {
-    /// Returns a globally-unique identifier for this `ComputePipeline`.
-    ///
-    /// Calling this method multiple times on the same object will always return the same value.
-    /// The returned value is guaranteed to be different for all resources created from the same `Instance`.
-    pub fn global_id(&self) -> Id<Self> {
-        Id::new(self.id)
-    }
-
     /// Get an object representing the bind group layout at a given index.
+    ///
+    /// If this pipeline was created with a [default layout][ComputePipelineDescriptor::layout],
+    /// then bind groups created with the returned `BindGroupLayout` can only be used with this
+    /// pipeline.
+    ///
+    /// This method will raise a validation error if there is no bind group layout at `index`.
     pub fn get_bind_group_layout(&self, index: u32) -> BindGroupLayout {
-        let context = Arc::clone(&self.context);
-        let (id, data) = self.context.compute_pipeline_get_bind_group_layout(
-            &self.id,
-            self.data.as_ref(),
-            index,
-        );
-        BindGroupLayout { context, id, data }
-    }
-}
-
-impl Drop for ComputePipeline {
-    fn drop(&mut self) {
-        if !thread::panicking() {
-            self.context
-                .compute_pipeline_drop(&self.id, self.data.as_ref());
-        }
+        let bind_group = self.inner.get_bind_group_layout(index);
+        BindGroupLayout { inner: bind_group }
     }
 }
 
@@ -59,6 +40,25 @@ pub struct ComputePipelineDescriptor<'a> {
     /// Debug label of the pipeline. This will show up in graphics debuggers for easy identification.
     pub label: Label<'a>,
     /// The layout of bind groups for this pipeline.
+    ///
+    /// If this is set, then [`Device::create_compute_pipeline`] will raise a validation error if
+    /// the layout doesn't match what the shader module(s) expect.
+    ///
+    /// Using the same [`PipelineLayout`] for many [`RenderPipeline`] or [`ComputePipeline`]
+    /// pipelines guarantees that you don't have to rebind any resources when switching between
+    /// those pipelines.
+    ///
+    /// ## Default pipeline layout
+    ///
+    /// If `layout` is `None`, then the pipeline has a [default layout] created and used instead.
+    /// The default layout is deduced from the shader modules.
+    ///
+    /// You can use [`ComputePipeline::get_bind_group_layout`] to create bind groups for use with
+    /// the default layout. However, these bind groups cannot be used with any other pipelines. This
+    /// is convenient for simple pipelines, but using an explicit layout is recommended in most
+    /// cases.
+    ///
+    /// [default layout]: https://www.w3.org/TR/webgpu/#default-pipeline-layout
     pub layout: Option<&'a PipelineLayout>,
     /// The compiled shader module for this stage.
     pub module: &'a ShaderModule,

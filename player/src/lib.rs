@@ -1,7 +1,7 @@
 //! This is a player library for WebGPU traces.
 
 #![cfg(not(target_arch = "wasm32"))]
-#![warn(unsafe_op_in_unsafe_fn)]
+#![warn(clippy::allow_attributes, unsafe_op_in_unsafe_fn)]
 
 use wgc::device::trace;
 
@@ -116,6 +116,94 @@ impl GlobalPlay for wgc::global::Global {
                         target_depth_stencil.as_ref(),
                         timestamp_writes.as_ref(),
                         occlusion_query_set_id,
+                    )
+                    .unwrap();
+                }
+                trace::Command::BuildAccelerationStructuresUnsafeTlas { blas, tlas } => {
+                    let blas_iter = blas.iter().map(|x| {
+                        let geometries = match &x.geometries {
+                            wgc::ray_tracing::TraceBlasGeometries::TriangleGeometries(
+                                triangle_geometries,
+                            ) => {
+                                let iter = triangle_geometries.iter().map(|tg| {
+                                    wgc::ray_tracing::BlasTriangleGeometry {
+                                        size: &tg.size,
+                                        vertex_buffer: tg.vertex_buffer,
+                                        index_buffer: tg.index_buffer,
+                                        transform_buffer: tg.transform_buffer,
+                                        first_vertex: tg.first_vertex,
+                                        vertex_stride: tg.vertex_stride,
+                                        first_index: tg.first_index,
+                                        transform_buffer_offset: tg.transform_buffer_offset,
+                                    }
+                                });
+                                wgc::ray_tracing::BlasGeometries::TriangleGeometries(Box::new(iter))
+                            }
+                        };
+                        wgc::ray_tracing::BlasBuildEntry {
+                            blas_id: x.blas_id,
+                            geometries,
+                        }
+                    });
+
+                    if !tlas.is_empty() {
+                        log::error!("a trace of command_encoder_build_acceleration_structures_unsafe_tlas containing a tlas build is not replayable! skipping tlas build");
+                    }
+
+                    self.command_encoder_build_acceleration_structures_unsafe_tlas(
+                        encoder,
+                        blas_iter,
+                        std::iter::empty(),
+                    )
+                    .unwrap();
+                }
+                trace::Command::BuildAccelerationStructures { blas, tlas } => {
+                    let blas_iter = blas.iter().map(|x| {
+                        let geometries = match &x.geometries {
+                            wgc::ray_tracing::TraceBlasGeometries::TriangleGeometries(
+                                triangle_geometries,
+                            ) => {
+                                let iter = triangle_geometries.iter().map(|tg| {
+                                    wgc::ray_tracing::BlasTriangleGeometry {
+                                        size: &tg.size,
+                                        vertex_buffer: tg.vertex_buffer,
+                                        index_buffer: tg.index_buffer,
+                                        transform_buffer: tg.transform_buffer,
+                                        first_vertex: tg.first_vertex,
+                                        vertex_stride: tg.vertex_stride,
+                                        first_index: tg.first_index,
+                                        transform_buffer_offset: tg.transform_buffer_offset,
+                                    }
+                                });
+                                wgc::ray_tracing::BlasGeometries::TriangleGeometries(Box::new(iter))
+                            }
+                        };
+                        wgc::ray_tracing::BlasBuildEntry {
+                            blas_id: x.blas_id,
+                            geometries,
+                        }
+                    });
+
+                    let tlas_iter = tlas.iter().map(|x| {
+                        let instances = x.instances.iter().map(|instance| {
+                            instance
+                                .as_ref()
+                                .map(|instance| wgc::ray_tracing::TlasInstance {
+                                    blas_id: instance.blas_id,
+                                    transform: &instance.transform,
+                                    custom_index: instance.custom_index,
+                                    mask: instance.mask,
+                                })
+                        });
+                        wgc::ray_tracing::TlasPackage {
+                            tlas_id: x.tlas_id,
+                            instances: Box::new(instances),
+                            lowest_unmodified: x.lowest_unmodified,
+                        }
+                    });
+
+                    self.command_encoder_build_acceleration_structures(
+                        encoder, blas_iter, tlas_iter,
                     )
                     .unwrap();
                 }
@@ -237,7 +325,7 @@ impl GlobalPlay for wgc::global::Global {
                     let module = ron::de::from_str(&code).unwrap();
                     wgc::pipeline::ShaderModuleSource::Naga(module)
                 } else {
-                    panic!("Unknown shader {}", data);
+                    panic!("Unknown shader {data}");
                 };
                 let (_, error) = self.device_create_shader_module(device, &desc, source, Some(id));
                 if let Some(e) = error {
@@ -352,17 +440,25 @@ impl GlobalPlay for wgc::global::Global {
                 let (encoder, error) = self.device_create_command_encoder(
                     device,
                     &wgt::CommandEncoderDescriptor { label: None },
-                    Some(
-                        comb_manager
-                            .process(device.backend())
-                            .into_command_encoder_id(),
-                    ),
+                    Some(comb_manager.process().into_command_encoder_id()),
                 );
                 if let Some(e) = error {
                     panic!("{e}");
                 }
                 let cmdbuf = self.encode_commands(encoder, commands);
                 self.queue_submit(queue, &[cmdbuf]).unwrap();
+            }
+            Action::CreateBlas { id, desc, sizes } => {
+                self.device_create_blas(device, &desc, sizes, Some(id));
+            }
+            Action::DestroyBlas(id) => {
+                self.blas_drop(id);
+            }
+            Action::CreateTlas { id, desc } => {
+                self.device_create_tlas(device, &desc, Some(id));
+            }
+            Action::DestroyTlas(id) => {
+                self.tlas_drop(id);
             }
         }
     }
