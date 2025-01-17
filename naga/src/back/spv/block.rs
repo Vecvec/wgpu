@@ -2292,7 +2292,7 @@ impl BlockContext<'_> {
     /// [`Break`]: Statement::Break
     /// [`Continue`]: Statement::Continue
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn write_block(
+    fn write_block(
         &mut self,
         label_id: Word,
         naga_block: &crate::Block,
@@ -3075,6 +3075,7 @@ impl BlockContext<'_> {
         &mut self,
         entry_id: Word,
         debug_info: Option<&DebugInfoInner>,
+        stage: Option<crate::ShaderStage>,
     ) -> Result<(), Error> {
         // We can ignore the `BlockExitDisposition` returned here because
         // `BlockExit::Return` doesn't refer to a block.
@@ -3084,6 +3085,7 @@ impl BlockContext<'_> {
             BlockExit::Return,
             LoopContext::default(),
             debug_info,
+            stage,
         )?;
 
         Ok(())

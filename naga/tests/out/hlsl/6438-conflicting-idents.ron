@@ -13,4 +13,14 @@
     ],
     compute:[
     ],
+    ray_gen:[
+    ],
+    closest_hit:[
+    ],
+    any_hit:[
+    ],
+    miss:[
+    ],
+    intersection:[
+    ],
 )

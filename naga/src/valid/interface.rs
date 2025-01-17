@@ -881,7 +881,8 @@ impl super::Validator {
                     } => storage_usage(access),
                     _ => GlobalUse::READ | GlobalUse::QUERY,
                 },
-                crate::AddressSpace::Private | crate::AddressSpace::WorkGroup
+                crate::AddressSpace::Private
+                | crate::AddressSpace::WorkGroup
                 | crate::AddressSpace::RayTracing => {
                     GlobalUse::READ | GlobalUse::WRITE | GlobalUse::QUERY
                 }

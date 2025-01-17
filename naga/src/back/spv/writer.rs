@@ -332,16 +332,18 @@ impl Writer {
         for argument in ir_function.arguments.iter() {
             let mut class = spirv::StorageClass::Input;
             let handle_ty = ir_module.types[argument.ty].inner.is_handle();
+            let mut arg_ty = argument.ty;
             if let crate::TypeInner::Pointer {
                 space: crate::AddressSpace::RayTracing,
-                ..
-            } = ir_module.types[argument.ty].inner
+                base,
+            } = ir_module.types[arg_ty].inner
             {
+                arg_ty = base;
                 class = map_storage_class(crate::AddressSpace::RayTracing);
             }
             let argument_type_id = match handle_ty {
-                true => self.get_pointer_id(argument.ty, spirv::StorageClass::UniformConstant),
-                false => self.get_type_id(LookupType::Handle(argument.ty)),
+                true => self.get_pointer_id(arg_ty, spirv::StorageClass::UniformConstant),
+                false => self.get_type_id(LookupType::Handle(arg_ty)),
             };
 
             if let Some(ref mut iface) = interface {
@@ -357,10 +359,12 @@ impl Writer {
                         Some(iface.stage),
                         class,
                         name,
-                        argument.ty,
+                        arg_ty,
                         binding,
                     )?;
-                    if self.physical_layout.version >= 0x10400 || class == spirv::StorageClass::Input {
+                    if self.physical_layout.version >= 0x10400
+                        || class == spirv::StorageClass::Input
+                    {
                         iface.varying_ids.push(varying_id);
                     }
 
@@ -384,7 +388,7 @@ impl Writer {
 
                     id
                 } else if let crate::TypeInner::Struct { ref members, .. } =
-                    ir_module.types[argument.ty].inner
+                    ir_module.types[arg_ty].inner
                 {
                     let struct_id = self.id_gen.next();
                     let mut constituent_ids = Vec::with_capacity(members.len());
@@ -434,7 +438,7 @@ impl Writer {
                     handle_id: if handle_ty {
                         let id = self.id_gen.next();
                         prelude.body.push(Instruction::load(
-                            self.get_type_id(LookupType::Handle(argument.ty)),
+                            self.get_type_id(LookupType::Handle(arg_ty)),
                             id,
                             argument_id,
                             None,
@@ -722,7 +726,7 @@ impl Writer {
             next_id
         };
 
-        context.write_function_body(main_id, debug_info.as_ref())?;
+        context.write_function_body(main_id, debug_info.as_ref(), stage)?;
 
         // Consume the `BlockContext`, ending its borrows and letting the
         // `Writer` steal back its cached expression table and temp_list.

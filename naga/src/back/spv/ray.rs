@@ -635,14 +635,13 @@ impl BlockContext<'_> {
                     payload_ty,
                     &crate::Binding::BuiltIn(crate::BuiltIn::Payload),
                 )?;
+                //let varying_id = self.get_type_id(LookupType::Handle(payload_ty));
 
                 let payload_id = self.cached[payload];
                 let desc_id = self.cached[descriptor];
-                let flag_type_id = self.get_type_id(LookupType::Local(LocalType::Value {
-                    vector_size: None,
-                    scalar: crate::Scalar::U32,
-                    pointer_space: None,
-                }));
+                let flag_type_id = self.get_type_id(LookupType::Local(LocalType::Numeric(
+                    NumericType::Scalar(crate::Scalar::U32),
+                )));
                 let ray_flags_id = self.gen_id();
                 block.body.push(Instruction::composite_extract(
                     flag_type_id,
@@ -658,11 +657,9 @@ impl BlockContext<'_> {
                     &[1],
                 ));
 
-                let scalar_type_id = self.get_type_id(LookupType::Local(LocalType::Value {
-                    vector_size: None,
-                    scalar: crate::Scalar::F32,
-                    pointer_space: None,
-                }));
+                let scalar_type_id = self.get_type_id(LookupType::Local(LocalType::Numeric(
+                    NumericType::Scalar(crate::Scalar::F32),
+                )));
                 let tmin_id = self.gen_id();
                 block.body.push(Instruction::composite_extract(
                     scalar_type_id,
@@ -678,11 +675,11 @@ impl BlockContext<'_> {
                     &[3],
                 ));
 
-                let vector_type_id = self.get_type_id(LookupType::Local(LocalType::Value {
-                    vector_size: Some(crate::VectorSize::Tri),
-                    scalar: crate::Scalar::F32,
-                    pointer_space: None,
-                }));
+                let vector_type_id =
+                    self.get_type_id(LookupType::Local(LocalType::Numeric(NumericType::Vector {
+                        size: crate::VectorSize::Tri,
+                        scalar: crate::Scalar::F32,
+                    })));
                 let ray_origin_id = self.gen_id();
                 block.body.push(Instruction::composite_extract(
                     vector_type_id,
@@ -740,7 +737,7 @@ impl BlockContext<'_> {
                     spirv::StorageClass::HitAttributeKHR,
                     None,
                 )
-                    .to_words(&mut self.writer.logical_layout.declarations);
+                .to_words(&mut self.writer.logical_layout.declarations);
                 let hit_t_id = self.cached[hit_t];
                 let hit_type_id = self.cached[hit_type];
                 let intersection_id = self.cached[intersection];
@@ -749,9 +746,11 @@ impl BlockContext<'_> {
                     .push(Instruction::store(pointer_type_id, intersection_id, None));
                 self.ray_tracing_global_vars.push(pointer_type_id);
                 let result_id = self.gen_id();
-                let result_ty_id = self.writer.get_expression_type_id(&TypeResolution::Value(
-                    crate::TypeInner::Scalar(crate::Scalar::BOOL),
-                ));
+                let result_ty_id =
+                    self.writer
+                        .get_expression_type_id(&TypeResolution::Value(TypeInner::Scalar(
+                            crate::Scalar::BOOL,
+                        )));
                 block.body.push(Instruction::report_intersection(
                     result_ty_id,
                     result_id,

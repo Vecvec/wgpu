@@ -595,7 +595,9 @@ impl ResolvedBinding {
                     Bi::SubgroupId => "simdgroup_index_in_threadgroup",
                     Bi::SubgroupSize => "threads_per_simdgroup",
                     Bi::SubgroupInvocationId => "thread_index_in_simdgroup",
-                    Bi::CullDistance | Bi::ViewIndex | Bi::DrawID
+                    Bi::CullDistance
+                    | Bi::ViewIndex
+                    | Bi::DrawID
                     | Bi::LaunchId
                     | Bi::LaunchSize
                     | Bi::Payload
@@ -611,9 +613,7 @@ impl ResolvedBinding {
                     | Bi::RayOrigin
                     | Bi::RayDirection
                     | Bi::RayFlags
-                    | Bi::ClosestRayT => {
-                        return Err(Error::UnsupportedBuiltIn(built_in))
-                    }
+                    | Bi::ClosestRayT => return Err(Error::UnsupportedBuiltIn(built_in)),
                 };
                 write!(out, "{name}")?;
             }

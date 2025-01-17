@@ -9,7 +9,8 @@ use super::{
 use crate::{
     back::{self, Baked},
     proc::{self, index, ExpressionKindTracker, NameKey},
-    valid, Handle, Module, RayTracingFunction, RayQueryFunction, Scalar, ScalarKind, ShaderStage, TypeInner,
+    valid, Handle, Module, RayQueryFunction, RayTracingFunction, Scalar, ScalarKind, ShaderStage,
+    TypeInner,
 };
 use std::{fmt, mem};
 
@@ -2747,7 +2748,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                                 crate::AddressSpace::Function
                                 | crate::AddressSpace::Private
                                 | crate::AddressSpace::WorkGroup
-                                | crate::AddressSpace::PushConstant,
+                                | crate::AddressSpace::PushConstant
+                                | crate::AddressSpace::RayTracing,
                             )
                             | None => true,
                             Some(crate::AddressSpace::Uniform) => false, // TODO: needs checks for dynamic uniform buffers, see https://github.com/gfx-rs/wgpu/issues/4483

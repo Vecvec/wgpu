@@ -195,9 +195,7 @@ impl crate::BuiltIn {
             | Self::RayOrigin
             | Self::RayDirection
             | Self::RayFlags
-            | Self::ClosestRayT => {
-                return Err(Error::Unimplemented(format!("builtin {self:?}")))
-            }
+            | Self::ClosestRayT => return Err(Error::Unimplemented(format!("builtin {self:?}"))),
             Self::PointSize | Self::ViewIndex | Self::PointCoord | Self::DrawID => {
                 return Err(Error::Custom(format!("Unsupported builtin {self:?}")))
             }

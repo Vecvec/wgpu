@@ -37,21 +37,21 @@ OpDecorate %66 BuiltIn RayTmaxNV
 OpDecorate %73 Location 0
 %2 = OpTypeVoid
 %3 = OpTypeAccelerationStructureNV
-%5 = OpTypeFloat 32
-%4 = OpTypeVector %5 4
+%4 = OpTypeFloat 32
+%5 = OpTypeVector %4 4
 %6 = OpTypeInt 32 0
-%7 = OpTypeVector %5 3
-%8 = OpTypeStruct %6 %6 %5 %5 %7 %7
-%9 = OpTypePointer IncomingRayPayloadNV %4
-%10 = OpTypeVector %5 2
+%7 = OpTypeVector %4 3
+%8 = OpTypeStruct %6 %6 %4 %4 %7 %7
+%9 = OpTypePointer IncomingRayPayloadNV %5
+%10 = OpTypeVector %4 2
 %11 = OpTypeStruct %10
 %13 = OpTypePointer UniformConstant %3
 %12 = OpVariable  %13  UniformConstant
 %16 = OpTypeFunction %2
-%18 = OpConstantNull  %4
+%18 = OpConstantNull  %5
 %19 = OpConstantNull  %8
-%21 = OpTypePointer Function %4
-%24 = OpTypePointer RayPayloadNV %4
+%21 = OpTypePointer Function %5
+%24 = OpTypePointer RayPayloadNV %5
 %23 = OpVariable  %24  RayPayloadNV
 %31 = OpConstant  %6  0
 %32 = OpConstant  %6  1
@@ -61,15 +61,15 @@ OpDecorate %73 Location 0
 %48 = OpVariable  %49  HitAttributeNV
 %54 = OpVariable  %9  IncomingRayPayloadNV
 %55 = OpVariable  %49  HitAttributeNV
-%58 = OpTypePointer Input %5
+%58 = OpTypePointer Input %4
 %57 = OpVariable  %58  Input
 %63 = OpVariable  %9  IncomingRayPayloadNV
 %64 = OpVariable  %49  HitAttributeNV
 %66 = OpVariable  %58  Input
-%69 = OpConstant  %5  1.0
-%70 = OpConstantComposite  %4  %69 %69 %69 %69
+%69 = OpConstant  %4  1.0
+%70 = OpConstantComposite  %5  %69 %69 %69 %69
 %73 = OpVariable  %9  IncomingRayPayloadNV
-%78 = OpConstant  %5  0.5
+%78 = OpConstant  %4  0.5
 %79 = OpConstant  %6  5
 %81 = OpTypePointer HitAttributeNV %6
 %82 = OpVariable  %81  HitAttributeNV
@@ -82,8 +82,8 @@ OpBranch %22
 %22 = OpLabel
 %25 = OpCompositeExtract  %6  %19 0
 %26 = OpCompositeExtract  %6  %19 1
-%27 = OpCompositeExtract  %5  %19 2
-%28 = OpCompositeExtract  %5  %19 3
+%27 = OpCompositeExtract  %4  %19 2
+%28 = OpCompositeExtract  %4  %19 3
 %29 = OpCompositeExtract  %7  %19 4
 %30 = OpCompositeExtract  %7  %19 5
 OpCopyMemory %23 %20
@@ -99,8 +99,8 @@ OpBranch %37
 %37 = OpLabel
 %39 = OpCompositeExtract  %6  %19 0
 %40 = OpCompositeExtract  %6  %19 1
-%41 = OpCompositeExtract  %5  %19 2
-%42 = OpCompositeExtract  %5  %19 3
+%41 = OpCompositeExtract  %4  %19 2
+%42 = OpCompositeExtract  %4  %19 3
 %43 = OpCompositeExtract  %7  %19 4
 %44 = OpCompositeExtract  %7  %19 5
 OpCopyMemory %38 %36
@@ -120,7 +120,7 @@ OpFunctionEnd
 %60 = OpFunction  %2  None %16
 %53 = OpLabel
 %56 = OpLoad  %11  %55
-%59 = OpLoad  %5  %57
+%59 = OpLoad  %4  %57
 OpBranch %61
 %61 = OpLabel
 OpStore %54 %18
@@ -129,7 +129,7 @@ OpFunctionEnd
 %68 = OpFunction  %2  None %16
 %62 = OpLabel
 %65 = OpLoad  %11  %64
-%67 = OpLoad  %5  %66
+%67 = OpLoad  %4  %66
 OpBranch %71
 %71 = OpLabel
 OpStore %63 %70
