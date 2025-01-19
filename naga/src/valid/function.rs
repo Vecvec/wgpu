@@ -1,7 +1,7 @@
 use super::validate_atomic_compare_exchange_struct;
 use crate::arena::{Arena, UniqueArena};
 use crate::arena::{Handle, HandleSet};
-use crate::RayTracingFunction;
+use crate::{RayTracingFunction, Type};
 
 use super::{
     analyzer::{UniformityDisruptor, UniformityRequirements},
@@ -204,7 +204,9 @@ pub enum FunctionError {
     MismatchedPayloadTypes {
         current: Handle<crate::Type>,
         previous: Handle<crate::Type>,
-    }
+    },
+    #[error("The provided type ({0:?}) was not ptr<ray_tracing, _>")]
+    InvalidPayloadType(Handle<crate::Type>),
 }
 
 bitflags::bitflags! {
@@ -1739,6 +1741,29 @@ impl super::Validator {
                     name: argument.name.clone().unwrap_or_default(),
                 }
                 .with_span_handle(argument.ty, &module.types));
+            }
+
+            if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Payload)) = argument.binding {
+                let crate::TypeInner::Pointer {
+                    base,
+                    space: crate::AddressSpace::RayTracing,
+                } = module.types[argument.ty].inner else {
+                    return Err(FunctionError::InvalidPayloadType(argument.ty).with_span_handle(argument.ty, &module.types));
+                };
+                match info.payload_type {
+                    None => {
+                        info.payload_type = Some(base);
+                    }
+                    Some(ty) => {
+                        if ty != base {
+                            return Err(FunctionError::MismatchedPayloadTypes {
+                                current: ty,
+                                previous: base,
+                                // not sure what this should have as a span
+                            }.with_span_handle(argument.ty, &module.types))
+                        }
+                    }
+                }
             }
         }
 
