@@ -1728,7 +1728,7 @@ impl Writer {
                         )?;
                         BuiltIn::WorldToObjectKHR
                     }
-                    Bi::InstanceCustomIndex => {
+                    Bi::InstanceCustomData => {
                         self.require_any(
                             "`instance custom index` built-in",
                             &[spirv::Capability::RayTracingKHR],

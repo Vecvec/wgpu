@@ -2,6 +2,9 @@ use crate::back::hlsl::BackendResult;
 use crate::{RayQueryIntersection, TypeInner};
 use std::fmt::Write;
 
+pub const MAP_HIT_NAME: &str = "map_hit";
+pub const MAP_FRONT_FACE_NAME: &str = "map_front_face";
+
 impl<W: Write> super::Writer<'_, W> {
     // constructs hlsl RayDesc from wgsl RayDesc
     pub(super) fn write_ray_desc_from_ray_desc_constructor_function(
@@ -158,6 +161,43 @@ impl<W: Write> super::Writer<'_, W> {
         writeln!(self.out, "    return ret;")?;
         writeln!(self.out, "}}")?;
         writeln!(self.out)?;
+        Ok(())
+    }
+    // see https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hitkind
+    pub(super) fn write_map_hit(&mut self) -> BackendResult {
+        if self.written_hit_map {
+            return Ok(());
+        }
+        writeln!(
+            self.out,
+            "uint {MAP_HIT_NAME}(uint kind) {{\
+    if (kind == 254 || kind == 255) {{\
+        return {};
+    }} else {{\
+        return kind;
+    }}\
+}}\
+",
+            RayQueryIntersection::Triangle as u32
+        )?;
+        Ok(())
+    }
+
+    pub(super) fn write_map_front_face(&mut self) -> BackendResult {
+        if self.written_front_face_map {
+            return Ok(());
+        }
+        writeln!(
+            self.out,
+            "bool {MAP_FRONT_FACE_NAME}(uint kind) {{\
+    if (kind == 254) {{\
+        return true;
+    }} else {{\
+        return false;
+    }}\
+}}\
+"
+        )?;
         Ok(())
     }
 }

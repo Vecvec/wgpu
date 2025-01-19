@@ -25,6 +25,8 @@ pub(crate) const MODF_FUNCTION: &str = "naga_modf";
 pub(crate) const FREXP_FUNCTION: &str = "naga_frexp";
 pub(crate) const EXTRACT_BITS_FUNCTION: &str = "naga_extractBits";
 pub(crate) const INSERT_BITS_FUNCTION: &str = "naga_insertBits";
+pub(crate) const PAYLOAD_VARIABLE: &str = "naga_payload";
+pub(crate) const INTERSECTION_VARIABLE: &str = "naga_intersection";
 
 struct EpStructMember {
     name: String,
@@ -107,6 +109,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             wrapped: super::Wrapped::default(),
             written_committed_intersection: false,
             written_candidate_intersection: false,
+            written_hit_map: false,
+            written_front_face_map: false,
             continue_ctx: back::continue_forward::ContinueCtx::default(),
             temp_access_chain: Vec::new(),
             need_bake_expressions: Default::default(),
@@ -128,6 +132,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         self.wrapped.clear();
         self.written_committed_intersection = false;
         self.written_candidate_intersection = false;
+        self.written_hit_map = false;
+        self.written_front_face_map = false;
         self.continue_ctx.clear();
         self.need_bake_expressions.clear();
     }
@@ -751,6 +757,12 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         };
         let mut fake_iter = ep_input.members.iter();
         for (arg_index, arg) in func.arguments.iter().enumerate() {
+            if let Some(crate::Binding::BuiltIn(
+                crate::BuiltIn::Payload | crate::BuiltIn::Intersection,
+            )) = arg.binding
+            {
+                continue;
+            }
             write!(self.out, "{}", back::INDENT)?;
             self.write_type(module, arg.ty)?;
             let arg_name = &self.names[&NameKey::EntryPointArgument(ep_index, arg_index as u32)];
@@ -1283,6 +1295,32 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             self.write_modifier(binding)?;
         }
 
+        if let back::FunctionType::EntryPoint(ep_index) = func_ctx.ty {
+            if let ShaderStage::AnyHit
+            | ShaderStage::ClosestHit
+            | ShaderStage::Intersection
+            | ShaderStage::Miss = module.entry_points[ep_index as usize].stage {
+                let mut needs_hit_map = false;
+                let mut needs_front_face_map = false;
+                for argument in func.arguments.iter() {
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::HitKind)) = argument.binding {
+                        needs_hit_map = true;
+                    }
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::FrontFacing)) = argument.binding {
+                        needs_front_face_map = true;
+                    }
+                }
+
+                if needs_hit_map {
+                    self.write_map_hit()?;
+                }
+
+                if needs_front_face_map {
+                    self.write_map_front_face()?;
+                }
+            }
+        }
+
         // Write return type
         if let Some(ref result) = func.result {
             match func_ctx.ty {
@@ -1306,6 +1344,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
 
         let need_workgroup_variables_initialization =
             self.need_workgroup_variables_initialization(func_ctx, module);
+
+        // All the ray-tracing builtins need to be declared using functions.
+        let mut deferred_builtins = Vec::new();
 
         // Write function arguments for non entry point functions
         match func_ctx.ty {
@@ -1337,11 +1378,79 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 }
             }
             back::FunctionType::EntryPoint(ep_index) => {
+                let stage = module.entry_points[ep_index as usize].stage;
+                let mut payload_name = None;
+                let mut intersection_name = None;
+                if self.entry_point_io[ep_index as usize].input.is_none() {
+                    for (index, arg) in func.arguments.iter().enumerate() {
+                        let argument_name =
+                            &self.names[&NameKey::EntryPointArgument(ep_index, index as u32)];
+                        // there can only be one builtin of each type
+                        if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Payload)) = arg.binding
+                        {
+                            payload_name = Some(argument_name.clone());
+                        }
+                        if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Intersection)) =
+                            arg.binding
+                        {
+                            intersection_name = Some(argument_name.clone());
+                        }
+                    }
+                }
+                if let ShaderStage::AnyHit
+                | ShaderStage::ClosestHit
+                | ShaderStage::Intersection
+                | ShaderStage::Miss = stage
+                {
+                    write!(
+                        self.out,
+                        "inout {}",
+                        payload_name.unwrap_or(PAYLOAD_VARIABLE.to_string())
+                    )?;
+                }
+                if let ShaderStage::AnyHit | ShaderStage::ClosestHit | ShaderStage::Intersection =
+                    stage
+                {
+                    write!(
+                        self.out,
+                        ", in {}",
+                        intersection_name.unwrap_or(INTERSECTION_VARIABLE.to_string())
+                    )?;
+                }
                 if let Some(ref ep_input) = self.entry_point_io[ep_index as usize].input {
                     write!(self.out, "{} {}", ep_input.ty_name, ep_input.arg_name)?;
                 } else {
-                    let stage = module.entry_points[ep_index as usize].stage;
                     for (index, arg) in func.arguments.iter().enumerate() {
+                        if let Some(crate::Binding::BuiltIn(builtin)) = arg.binding {
+                            match builtin {
+                                crate::BuiltIn::Payload | crate::BuiltIn::Intersection => continue,
+                                crate::BuiltIn::LaunchId
+                                | crate::BuiltIn::LaunchSize
+                                | crate::BuiltIn::RayT
+                                | crate::BuiltIn::GeometryIndex
+                                | crate::BuiltIn::ObjectRayOrigin
+                                | crate::BuiltIn::ObjectRayDirection
+                                | crate::BuiltIn::HitKind
+                                | crate::BuiltIn::ObjectToWorld
+                                | crate::BuiltIn::WorldToObject
+                                | crate::BuiltIn::InstanceCustomData
+                                | crate::BuiltIn::RayOrigin
+                                | crate::BuiltIn::RayDirection
+                                | crate::BuiltIn::RayFlags
+                                | crate::BuiltIn::ClosestRayT => {
+                                    deferred_builtins.push((
+                                        builtin,
+                                        self.names
+                                            [&NameKey::EntryPointArgument(ep_index, index as u32)]
+                                            .clone(),
+                                        arg.ty,
+                                    ));
+                                    continue;
+                                }
+                                _ => {}
+                            }
+                        }
+
                         if index != 0 {
                             write!(self.out, ", ")?;
                         }
@@ -1389,6 +1498,58 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
 
         if let back::FunctionType::EntryPoint(index) = func_ctx.ty {
             self.write_ep_arguments_initialization(module, func, index)?;
+        }
+
+        for (deferred_builtin, name, ty) in deferred_builtins {
+            self.write_type(module, ty)?;
+            write!(self.out, " {name} = ")?;
+            let call = match deferred_builtin {
+                crate::BuiltIn::Position { .. }
+                | crate::BuiltIn::ViewIndex
+                | crate::BuiltIn::BaseInstance
+                | crate::BuiltIn::BaseVertex
+                | crate::BuiltIn::ClipDistance
+                | crate::BuiltIn::CullDistance
+                | crate::BuiltIn::PointSize
+                | crate::BuiltIn::VertexIndex
+                | crate::BuiltIn::DrawID
+                | crate::BuiltIn::FragDepth
+                | crate::BuiltIn::PointCoord
+                | crate::BuiltIn::SampleIndex
+                | crate::BuiltIn::SampleMask
+                | crate::BuiltIn::GlobalInvocationId
+                | crate::BuiltIn::LocalInvocationId
+                | crate::BuiltIn::LocalInvocationIndex
+                | crate::BuiltIn::WorkGroupId
+                | crate::BuiltIn::WorkGroupSize
+                | crate::BuiltIn::NumWorkGroups
+                | crate::BuiltIn::NumSubgroups
+                | crate::BuiltIn::SubgroupId
+                | crate::BuiltIn::SubgroupSize
+                | crate::BuiltIn::SubgroupInvocationId
+                | crate::BuiltIn::Payload
+                | crate::BuiltIn::Intersection => {
+                    unreachable!("{:?} should never be deferred", deferred_builtin)
+                }
+                crate::BuiltIn::LaunchId => "DispatchRayIndex()",
+                crate::BuiltIn::LaunchSize => "DispatchRaysDimensions()",
+                crate::BuiltIn::RayT => "RayTCurrent()",
+                crate::BuiltIn::GeometryIndex => "GeometryIndex()",
+                crate::BuiltIn::ObjectRayOrigin => "ObjectRayOrigin()",
+                crate::BuiltIn::ObjectRayDirection => "ObjectRayDirection()",
+                crate::BuiltIn::HitKind => &format!("{}(HitKind())", super::ray::MAP_HIT_NAME),
+                crate::BuiltIn::ObjectToWorld => "ObjectToWorld3x4()",
+                crate::BuiltIn::WorldToObject => "WorldToObject3x4()",
+                crate::BuiltIn::InstanceCustomData => "InstanceID()",
+                crate::BuiltIn::InstanceIndex => "InstanceIndex()",
+                crate::BuiltIn::RayOrigin => "WorldRayOrigin()",
+                crate::BuiltIn::RayDirection => "WorldRayDirection()",
+                crate::BuiltIn::RayFlags => "RayFlags()",
+                crate::BuiltIn::ClosestRayT => "RayTCurrent()",
+                crate::BuiltIn::FrontFacing => &format!("{}(HitKind())", super::ray::MAP_FRONT_FACE_NAME),
+                crate::BuiltIn::PrimitiveIndex => "PrimitiveIndex()",
+            };
+            writeln!(self.out, "{call};")?;
         }
 
         // Write function local variables

@@ -4885,7 +4885,7 @@ const fn glsl_built_in(built_in: crate::BuiltIn, options: VaryingOptions) -> &'s
         | Bi::HitKind
         | Bi::ObjectToWorld
         | Bi::WorldToObject
-        | Bi::InstanceCustomIndex
+        | Bi::InstanceCustomData
         | Bi::RayOrigin
         | Bi::RayDirection
         | Bi::RayFlags

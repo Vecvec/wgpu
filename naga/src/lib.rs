@@ -444,7 +444,7 @@ pub enum BuiltIn {
     HitKind,
     ObjectToWorld,
     WorldToObject,
-    InstanceCustomIndex,
+    InstanceCustomData,
     // any raytracing but ray gen
     RayOrigin,
     RayDirection,

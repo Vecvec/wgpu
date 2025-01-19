@@ -2028,7 +2028,7 @@ fn builtin_str(built_in: crate::BuiltIn) -> Result<&'static str, Error> {
         | Bi::HitKind
         | Bi::ObjectToWorld
         | Bi::WorldToObject
-        | Bi::InstanceCustomIndex
+        | Bi::InstanceCustomData
         | Bi::RayOrigin
         | Bi::RayDirection
         | Bi::RayFlags

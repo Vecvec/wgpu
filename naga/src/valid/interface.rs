@@ -374,7 +374,7 @@ impl VaryingContext<'_> {
                                 scalar: crate::Scalar::F32,
                             },
                     ),
-                    Bi::InstanceCustomIndex => (
+                    Bi::InstanceCustomData => (
                         (self.stage == St::AnyHit || self.stage == St::ClosestHit) && !self.output,
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),

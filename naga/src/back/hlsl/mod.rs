@@ -164,7 +164,11 @@ impl crate::ShaderStage {
             Self::Vertex => "vs",
             Self::Fragment => "ps",
             Self::Compute => "cs",
-            _ => panic!("need to check ray names"),
+            Self::RayGeneration => "raygeneration",
+            Self::ClosestHit => "closesthit",
+            Self::AnyHit => "anyhit",
+            Self::Miss => "miss",
+            Self::Intersection => "intersection",
         }
     }
 }
@@ -335,6 +339,8 @@ pub struct Writer<'a, W> {
     wrapped: Wrapped,
     written_committed_intersection: bool,
     written_candidate_intersection: bool,
+    written_hit_map: bool,
+    written_front_face_map: bool,
     continue_ctx: back::continue_forward::ContinueCtx,
 
     /// A reference to some part of a global variable, lowered to a series of

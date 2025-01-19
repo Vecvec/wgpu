@@ -820,6 +820,10 @@ pub const RESERVED: &[&str] = &[
     super::writer::FREXP_FUNCTION,
     super::writer::EXTRACT_BITS_FUNCTION,
     super::writer::INSERT_BITS_FUNCTION,
+    super::writer::INTERSECTION_VARIABLE,
+    super::writer::PAYLOAD_VARIABLE,
+    super::ray::MAP_HIT_NAME,
+    super::ray::MAP_FRONT_FACE_NAME,
 ];
 
 // DXC scalar types, from https://github.com/microsoft/DirectXShaderCompiler/blob/18c9e114f9c314f93e68fbc72ce207d4ed2e65ae/tools/clang/lib/AST/ASTContextHLSL.cpp#L48-L254

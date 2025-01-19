@@ -609,7 +609,7 @@ impl ResolvedBinding {
                     | Bi::HitKind
                     | Bi::ObjectToWorld
                     | Bi::WorldToObject
-                    | Bi::InstanceCustomIndex
+                    | Bi::InstanceCustomData
                     | Bi::RayOrigin
                     | Bi::RayDirection
                     | Bi::RayFlags

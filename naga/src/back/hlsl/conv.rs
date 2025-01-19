@@ -177,13 +177,15 @@ impl crate::BuiltIn {
             | Self::SubgroupInvocationId
             | Self::NumSubgroups
             | Self::SubgroupId => unreachable!(),
+            Self::Intersection | Self::Payload => {
+                unreachable!("these builtins should have already been written")
+            }
+
             Self::BaseInstance
             | Self::BaseVertex
             | Self::WorkGroupSize
             | Self::LaunchId
             | Self::LaunchSize
-            | Self::Intersection
-            | Self::Payload
             | Self::RayT
             | Self::GeometryIndex
             | Self::ObjectRayOrigin
@@ -191,7 +193,7 @@ impl crate::BuiltIn {
             | Self::HitKind
             | Self::ObjectToWorld
             | Self::WorldToObject
-            | Self::InstanceCustomIndex
+            | Self::InstanceCustomData
             | Self::RayOrigin
             | Self::RayDirection
             | Self::RayFlags
