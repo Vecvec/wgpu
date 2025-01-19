@@ -1517,6 +1517,7 @@ impl super::Validator {
                                 return Err(FunctionError::InvalidRayPayload(*payload)
                                     .with_span_static(span, "TraceRay"));
                             }
+                            stages &= super::ShaderStages::RAY_GENERATION | super::ShaderStages::CLOSEST_HIT;
                         }
                         RayTracingFunction::ReportIntersection {
                             ref hit_t,
@@ -1546,6 +1547,7 @@ impl super::Validator {
                                 }
                             }
                             self.emit_expression(*result, context)?;
+                            stages &= super::ShaderStages::INTERSECTION;
                         }
                     }
                 }
