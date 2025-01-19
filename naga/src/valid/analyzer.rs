@@ -234,7 +234,10 @@ pub struct FunctionInfo {
     flags: ValidationFlags,
     /// Set of shader stages where calling this function is valid.
     pub available_stages: ShaderStages,
+    /// The type that all payloads in this function are.
     pub payload_type: Option<Handle<crate::Type>>,
+    /// The type that all `ReportIntersection` calls use.
+    pub intersection_reported_type: Option<Handle<crate::Type>>,
     /// Uniformity characteristics.
     pub uniformity: Uniformity,
     /// Function may kill the invocation.
@@ -429,6 +432,22 @@ impl FunctionInfo {
                         return Err(FunctionError::MismatchedPayloadTypes {
                             current: ty,
                             previous: payload_ty,
+                            // not sure what this should have as a span
+                        }.with_span())
+                    }
+                }
+            }
+        }
+        if let Some(intersection_ty) = callee.intersection_reported_type {
+            match self.intersection_reported_type {
+                None => {
+                    self.intersection_reported_type = Some(intersection_ty);
+                }
+                Some(ty) => {
+                    if ty != intersection_ty {
+                        return Err(FunctionError::MismatchedPayloadTypes {
+                            current: ty,
+                            previous: intersection_ty,
                             // not sure what this should have as a span
                         }.with_span())
                     }
@@ -1113,8 +1132,22 @@ impl FunctionInfo {
                             hit_t,
                             hit_type,
                             intersection,
+                            intersection_ty,
                             ..
                         } => {
+                            match self.intersection_reported_type {
+                                None => {
+                                    self.intersection_reported_type = Some(intersection_ty);
+                                }
+                                Some(ty) => {
+                                    if ty != intersection_ty {
+                                        return Err(FunctionError::MismatchedPayloadTypes {
+                                            current: ty,
+                                            previous: intersection_ty,
+                                        }.with_span_handle(intersection, expression_arena))
+                                    }
+                                }
+                            }
                             let _ = self.add_ref(hit_t);
                             let _ = self.add_ref(hit_type);
                             let _ = self.add_ref(intersection);
@@ -1217,6 +1250,7 @@ impl ModuleInfo {
             flags,
             available_stages: ShaderStages::all(),
             payload_type: None,
+            intersection_reported_type: None,
             uniformity: Uniformity::new(),
             may_kill: false,
             sampling_set: crate::FastHashSet::default(),
@@ -1338,6 +1372,7 @@ fn uniform_control_flow() {
         flags: ValidationFlags::all(),
         available_stages: ShaderStages::all(),
         payload_type: None,
+        intersection_reported_type: None,
         uniformity: Uniformity::new(),
         may_kill: false,
         sampling_set: crate::FastHashSet::default(),

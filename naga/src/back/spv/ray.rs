@@ -719,14 +719,14 @@ impl BlockContext<'_> {
                 hit_t,
                 hit_type,
                 intersection,
-                ref intersection_ty,
+                intersection_ty,
                 result,
             } => {
                 let id = self.gen_id();
                 let pointer_type_id = self.gen_id();
                 let ty_id = self
                     .writer
-                    .get_expression_type_id(&TypeResolution::Value(intersection_ty.clone()));
+                    .get_expression_type_id(&TypeResolution::Handle(intersection_ty));
                 let instruction =
                     Instruction::type_pointer(id, spirv::StorageClass::HitAttributeKHR, ty_id);
                 //let id = self.gen_id();

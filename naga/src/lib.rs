@@ -1814,7 +1814,7 @@ pub enum RayTracingFunction {
         hit_t: Handle<Expression>,
         hit_type: Handle<Expression>,
         intersection: Handle<Expression>,
-        intersection_ty: TypeInner,
+        intersection_ty: Handle<Type>,
         result: Handle<Expression>,
     },
     TraceRay {
