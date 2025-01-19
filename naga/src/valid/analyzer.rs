@@ -8,11 +8,7 @@
 use super::{ExpressionError, FunctionError, ModuleInfo, ShaderStages, ValidationFlags};
 use crate::diagnostic_filter::{DiagnosticFilterNode, StandardFilterableTriggeringRule};
 use crate::span::{AddSpan as _, WithSpan};
-use crate::{
-    arena::{Arena, Handle},
-    proc::{ResolveContext, TypeResolution},
-    RayTracingFunction,
-};
+use crate::{arena::{Arena, Handle}, proc::{ResolveContext, TypeResolution}, RayTracingFunction};
 use std::ops;
 
 pub type NonUniformResult = Option<Handle<crate::Expression>>;
@@ -238,6 +234,7 @@ pub struct FunctionInfo {
     flags: ValidationFlags,
     /// Set of shader stages where calling this function is valid.
     pub available_stages: ShaderStages,
+    pub payload_type: Option<Handle<crate::Type>>,
     /// Uniformity characteristics.
     pub uniformity: Uniformity,
     /// Function may kill the invocation.
@@ -422,6 +419,22 @@ impl FunctionInfo {
         arguments: &[Handle<crate::Expression>],
         expression_arena: &Arena<crate::Expression>,
     ) -> Result<FunctionUniformity, WithSpan<FunctionError>> {
+        if let Some(payload_ty) = callee.payload_type {
+            match self.payload_type {
+                None => {
+                    self.payload_type = Some(payload_ty);
+                }
+                Some(ty) => {
+                    if ty != payload_ty {
+                        return Err(FunctionError::MismatchedPayloadTypes {
+                            current: ty,
+                            previous: payload_ty,
+                            // not sure what this should have as a span
+                        }.with_span())
+                    }
+                }
+            }
+        }
         self.sampling_set
             .extend(callee.sampling_set.iter().cloned());
         for sampling in callee.sampling.iter() {
@@ -1094,8 +1107,8 @@ impl FunctionInfo {
                     }
                     FunctionUniformity::new()
                 }
-                S::RayTracing { ref fun } => {
-                    match *fun {
+                S::RayTracing { fun: ref rt_fun } => {
+                    match *rt_fun {
                         RayTracingFunction::ReportIntersection {
                             hit_t,
                             hit_type,
@@ -1110,8 +1123,22 @@ impl FunctionInfo {
                             descriptor,
                             payload,
                             acceleration_structure,
+                            payload_ty,
                             ..
                         } => {
+                            match self.payload_type {
+                                None => {
+                                    self.payload_type = Some(payload_ty);
+                                }
+                                Some(ty) => {
+                                    if ty != payload_ty {
+                                        return Err(FunctionError::MismatchedPayloadTypes {
+                                            current: ty,
+                                            previous: payload_ty,
+                                        }.with_span_handle(payload, expression_arena))
+                                    }
+                                }
+                            }
                             let _ = self.add_ref(acceleration_structure);
                             let _ = self.add_ref(descriptor);
                             let _ = self.add_ref(payload);
@@ -1189,6 +1216,7 @@ impl ModuleInfo {
         let mut info = FunctionInfo {
             flags,
             available_stages: ShaderStages::all(),
+            payload_type: None,
             uniformity: Uniformity::new(),
             may_kill: false,
             sampling_set: crate::FastHashSet::default(),
@@ -1309,6 +1337,7 @@ fn uniform_control_flow() {
     let mut info = FunctionInfo {
         flags: ValidationFlags::all(),
         available_stages: ShaderStages::all(),
+        payload_type: None,
         uniformity: Uniformity::new(),
         may_kill: false,
         sampling_set: crate::FastHashSet::default(),

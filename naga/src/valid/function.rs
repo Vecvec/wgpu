@@ -200,6 +200,11 @@ pub enum FunctionError {
     EmitResult(Handle<crate::Expression>),
     #[error("Expression not visited by the appropriate statement")]
     UnvisitedExpression(Handle<crate::Expression>),
+    #[error("Payload type {current:?} does not match previous call(s) {previous:?}")]
+    MismatchedPayloadTypes {
+        current: Handle<crate::Type>,
+        previous: Handle<crate::Type>,
+    }
 }
 
 bitflags::bitflags! {
