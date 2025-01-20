@@ -164,11 +164,11 @@ impl crate::ShaderStage {
             Self::Vertex => "vs",
             Self::Fragment => "ps",
             Self::Compute => "cs",
-            Self::RayGeneration => "raygeneration",
-            Self::ClosestHit => "closesthit",
-            Self::AnyHit => "anyhit",
-            Self::Miss => "miss",
-            Self::Intersection => "intersection",
+            Self::RayGeneration => "lib",
+            Self::ClosestHit => "lib",
+            Self::AnyHit => "lib",
+            Self::Miss => "lib",
+            Self::Intersection => "lib",
         }
     }
 }

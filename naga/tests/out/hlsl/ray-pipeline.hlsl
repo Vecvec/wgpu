@@ -81,6 +81,7 @@ void trace()
 TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, { ZeroValueRayDesc_().origin, ZeroValueRayDesc_().tmin, ZeroValueRayDesc_().dir, ZeroValueRayDesc_().tmax}, colour_5);    return;
 }
 
+[shader("raygeneration")]
 void ray_gen()
 {
     float4 colour = ZeroValuefloat4();
@@ -89,12 +90,14 @@ TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0
     return;
 }
 
+[shader("anyhit")]
 void discard_any_hit(inout colour_1, in intersection)
 {
     colour_1 = ZeroValuefloat4();
     discard;
 }
 
+[shader("anyhit")]
 void any_hit(inout colour_2, in intersection_1)
 {
 float t = RayTCurrent();
@@ -102,6 +105,7 @@ float t = RayTCurrent();
     return;
 }
 
+[shader("closesthit")]
 void closest_hit(inout colour_3, in intersection_2)
 {
 float t_1 = RayTCurrent();
@@ -109,12 +113,14 @@ float t_1 = RayTCurrent();
     return;
 }
 
+[shader("miss")]
 void miss(inout colour_4)
 {
     colour_4 = ZeroValuefloat4();
     return;
 }
 
+[shader("intersection")]
 void intersect_return(inout naga_payload, in naga_intersection)
 {
 ReportHit(0.5, 5u, 0u);    return;

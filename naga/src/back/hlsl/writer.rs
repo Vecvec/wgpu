@@ -403,14 +403,48 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
 
             self.write_wrapped_functions(module, &ctx)?;
 
-            if ep.stage == ShaderStage::Compute {
-                // HLSL is calling workgroup size "num threads"
-                let num_threads = ep.workgroup_size;
-                writeln!(
-                    self.out,
-                    "[numthreads({}, {}, {})]",
-                    num_threads[0], num_threads[1], num_threads[2]
-                )?;
+            match ep.stage {
+                ShaderStage::Vertex | ShaderStage::Fragment => {}
+                ShaderStage::Compute => {
+                    // HLSL is calling workgroup size "num threads"
+                    let num_threads = ep.workgroup_size;
+                    writeln!(
+                        self.out,
+                        "[numthreads({}, {}, {})]",
+                        num_threads[0], num_threads[1], num_threads[2]
+                    )?;
+                }
+                ShaderStage::RayGeneration => {
+                    // For the raytracing shaders we need to compile as a lib, therefore we need to mark all entry points.
+                    writeln!(
+                        self.out,
+                        "[shader(\"raygeneration\")]",
+                    )?;
+                }
+                ShaderStage::ClosestHit => {
+                    writeln!(
+                        self.out,
+                        "[shader(\"closesthit\")]",
+                    )?;
+                }
+                ShaderStage::AnyHit => {
+                    writeln!(
+                        self.out,
+                        "[shader(\"anyhit\")]",
+                    )?;
+                }
+                ShaderStage::Miss => {
+                    writeln!(
+                        self.out,
+                        "[shader(\"miss\")]",
+                    )?;
+                }
+                ShaderStage::Intersection => {
+                    writeln!(
+                        self.out,
+                        "[shader(\"intersection\")]",
+                    )?;
+                }
             }
 
             let name = self.names[&NameKey::EntryPoint(index as u16)].clone();
