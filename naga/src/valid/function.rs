@@ -1759,7 +1759,6 @@ impl super::Validator {
                             return Err(FunctionError::MismatchedPayloadTypes {
                                 current: ty,
                                 previous: base,
-                                // not sure what this should have as a span
                             }.with_span_handle(argument.ty, &module.types))
                         }
                     }
