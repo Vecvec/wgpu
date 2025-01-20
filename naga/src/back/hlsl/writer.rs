@@ -416,34 +416,19 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 }
                 ShaderStage::RayGeneration => {
                     // For the raytracing shaders we need to compile as a lib, therefore we need to mark all entry points.
-                    writeln!(
-                        self.out,
-                        "[shader(\"raygeneration\")]",
-                    )?;
+                    writeln!(self.out, "[shader(\"raygeneration\")]",)?;
                 }
                 ShaderStage::ClosestHit => {
-                    writeln!(
-                        self.out,
-                        "[shader(\"closesthit\")]",
-                    )?;
+                    writeln!(self.out, "[shader(\"closesthit\")]",)?;
                 }
                 ShaderStage::AnyHit => {
-                    writeln!(
-                        self.out,
-                        "[shader(\"anyhit\")]",
-                    )?;
+                    writeln!(self.out, "[shader(\"anyhit\")]",)?;
                 }
                 ShaderStage::Miss => {
-                    writeln!(
-                        self.out,
-                        "[shader(\"miss\")]",
-                    )?;
+                    writeln!(self.out, "[shader(\"miss\")]",)?;
                 }
                 ShaderStage::Intersection => {
-                    writeln!(
-                        self.out,
-                        "[shader(\"intersection\")]",
-                    )?;
+                    writeln!(self.out, "[shader(\"intersection\")]",)?;
                 }
             }
 
@@ -1579,7 +1564,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 crate::BuiltIn::HitKind => {
                     temp_string = format!("{}(HitKind())", super::ray::MAP_HIT_NAME);
                     &temp_string
-                },
+                }
                 crate::BuiltIn::ObjectToWorld => "ObjectToWorld3x4()",
                 crate::BuiltIn::WorldToObject => "WorldToObject3x4()",
                 crate::BuiltIn::InstanceCustomData => "InstanceID()",
