@@ -33,6 +33,14 @@ RayDesc_ ZeroValueRayDesc_() {
     return (RayDesc_)0;
 }
 
+struct NagaWrapperStructForfloat4 {
+float4 inner;
+};
+NagaWrapperStructForfloat4 NagaWrapperStructForfloat4Construct(float4 inner) {
+    NagaWrapperStructForfloat4 ret = (NagaWrapperStructForfloat4)0;
+    ret.inner = inner;
+    return ret;
+}
 void trace()
 {
     float4 colour_5 = ZeroValuefloat4();
@@ -42,14 +50,6 @@ void trace()
     return;
 }
 
-struct NagaWrapperStructForfloat4 {
-float4 inner;
-};
-NagaWrapperStructForfloat4 NagaWrapperStructForfloat4Construct(float4 inner) {
-    NagaWrapperStructForfloat4 ret = (NagaWrapperStructForfloat4)0;
-    ret.inner = inner;
-    return ret;
-}
 [shader("raygeneration")]
 void ray_gen()
 {

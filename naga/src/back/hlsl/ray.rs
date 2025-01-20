@@ -238,10 +238,6 @@ impl<W: Write> super::Writer<'_, W> {
                         blocks.push(accept);
                         blocks.push(reject);
                     }
-                    Statement::Call { function, .. } => {
-                        let fun_block = &module.functions[function].body;
-                        blocks.push(fun_block);
-                    }
                     Statement::Loop {
                         ref body,
                         ref continuing,
@@ -255,6 +251,7 @@ impl<W: Write> super::Writer<'_, W> {
                             blocks.push(&case.body)
                         }
                     }
+                    // Each function checks their own blocks so we don't need to check called functions here.
                     _ => {}
                 }
             }

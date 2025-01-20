@@ -1359,6 +1359,10 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         {
             self.write_modifier(binding)?;
         }
+        if let back::FunctionType::Function(_) = func_ctx.ty {
+            // We only write this here if it's not an entry point as those are written earlier.
+            self.write_wrapper_struct_from_block(module, &func.body)?;
+        }
 
         // Write return type
         if let Some(ref result) = func.result {
