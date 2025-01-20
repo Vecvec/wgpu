@@ -2571,19 +2571,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     write!(self.out, "0, ")?;
                     write!(self.out, "0, ")?;
                     write!(self.out, "0, ")?;
-                    write!(self.out, "{{ ")?;
+                    write!(self.out, "RayDescFromRayDesc_(")?;
                     self.write_expr(module, *descriptor, func_ctx)?;
-                    write!(self.out, ".origin")?;
-                    write!(self.out, ", ")?;
-                    self.write_expr(module, *descriptor, func_ctx)?;
-                    write!(self.out, ".tmin")?;
-                    write!(self.out, ", ")?;
-                    self.write_expr(module, *descriptor, func_ctx)?;
-                    write!(self.out, ".dir")?;
-                    write!(self.out, ", ")?;
-                    self.write_expr(module, *descriptor, func_ctx)?;
-                    write!(self.out, ".tmax")?;
-                    write!(self.out, "}}, ")?;
+                    write!(self.out, "), ")?;
                     self.write_expr(module, *payload, func_ctx)?;
                     write!(self.out, ");")?;
                 }

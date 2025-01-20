@@ -37,7 +37,7 @@ void trace()
 {
     float4 colour_5 = ZeroValuefloat4();
 
-TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, { ZeroValueRayDesc_().origin, ZeroValueRayDesc_().tmin, ZeroValueRayDesc_().dir, ZeroValueRayDesc_().tmax}, colour_5);    return;
+TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), colour_5);    return;
 }
 
 [shader("raygeneration")]
@@ -45,7 +45,7 @@ void ray_gen()
 {
     float4 colour = ZeroValuefloat4();
 
-TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, { ZeroValueRayDesc_().origin, ZeroValueRayDesc_().tmin, ZeroValueRayDesc_().dir, ZeroValueRayDesc_().tmax}, colour);    trace();
+TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), colour);    trace();
     return;
 }
 
