@@ -1519,7 +1519,8 @@ impl super::Validator {
                                 return Err(FunctionError::InvalidRayPayload(*payload)
                                     .with_span_static(span, "TraceRay"));
                             }
-                            stages &= super::ShaderStages::RAY_GENERATION | super::ShaderStages::CLOSEST_HIT;
+                            stages &= super::ShaderStages::RAY_GENERATION
+                                | super::ShaderStages::CLOSEST_HIT;
                         }
                         RayTracingFunction::ReportIntersection {
                             ref hit_t,
@@ -1747,8 +1748,10 @@ impl super::Validator {
                 let crate::TypeInner::Pointer {
                     base,
                     space: crate::AddressSpace::RayTracing,
-                } = module.types[argument.ty].inner else {
-                    return Err(FunctionError::InvalidPayloadType(argument.ty).with_span_handle(argument.ty, &module.types));
+                } = module.types[argument.ty].inner
+                else {
+                    return Err(FunctionError::InvalidPayloadType(argument.ty)
+                        .with_span_handle(argument.ty, &module.types));
                 };
                 match info.payload_type {
                     None => {
@@ -1759,7 +1762,8 @@ impl super::Validator {
                             return Err(FunctionError::MismatchedPayloadTypes {
                                 current: ty,
                                 previous: base,
-                            }.with_span_handle(argument.ty, &module.types))
+                            }
+                            .with_span_handle(argument.ty, &module.types));
                         }
                     }
                 }

@@ -8,7 +8,11 @@
 use super::{ExpressionError, FunctionError, ModuleInfo, ShaderStages, ValidationFlags};
 use crate::diagnostic_filter::{DiagnosticFilterNode, StandardFilterableTriggeringRule};
 use crate::span::{AddSpan as _, WithSpan};
-use crate::{arena::{Arena, Handle}, proc::{ResolveContext, TypeResolution}, RayTracingFunction};
+use crate::{
+    arena::{Arena, Handle},
+    proc::{ResolveContext, TypeResolution},
+    RayTracingFunction,
+};
 use std::ops;
 
 pub type NonUniformResult = Option<Handle<crate::Expression>>;
@@ -433,7 +437,8 @@ impl FunctionInfo {
                             current: ty,
                             previous: payload_ty,
                             // not sure what this should have as a span
-                        }.with_span())
+                        }
+                        .with_span());
                     }
                 }
             }
@@ -449,7 +454,8 @@ impl FunctionInfo {
                             current: ty,
                             previous: intersection_ty,
                             // not sure what this should have as a span
-                        }.with_span())
+                        }
+                        .with_span());
                     }
                 }
             }
@@ -1144,7 +1150,8 @@ impl FunctionInfo {
                                         return Err(FunctionError::MismatchedPayloadTypes {
                                             current: ty,
                                             previous: intersection_ty,
-                                        }.with_span_handle(intersection, expression_arena))
+                                        }
+                                        .with_span_handle(intersection, expression_arena));
                                     }
                                 }
                             }
@@ -1168,7 +1175,8 @@ impl FunctionInfo {
                                         return Err(FunctionError::MismatchedPayloadTypes {
                                             current: ty,
                                             previous: payload_ty,
-                                        }.with_span_handle(payload, expression_arena))
+                                        }
+                                        .with_span_handle(payload, expression_arena));
                                     }
                                 }
                             }

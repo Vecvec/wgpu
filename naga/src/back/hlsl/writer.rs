@@ -1299,14 +1299,18 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             if let ShaderStage::AnyHit
             | ShaderStage::ClosestHit
             | ShaderStage::Intersection
-            | ShaderStage::Miss = module.entry_points[ep_index as usize].stage {
+            | ShaderStage::Miss = module.entry_points[ep_index as usize].stage
+            {
                 let mut needs_hit_map = false;
                 let mut needs_front_face_map = false;
                 for argument in func.arguments.iter() {
-                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::HitKind)) = argument.binding {
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::HitKind)) = argument.binding
+                    {
                         needs_hit_map = true;
                     }
-                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::FrontFacing)) = argument.binding {
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::FrontFacing)) =
+                        argument.binding
+                    {
                         needs_front_face_map = true;
                     }
                 }
@@ -1546,7 +1550,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 crate::BuiltIn::RayDirection => "WorldRayDirection()",
                 crate::BuiltIn::RayFlags => "RayFlags()",
                 crate::BuiltIn::ClosestRayT => "RayTCurrent()",
-                crate::BuiltIn::FrontFacing => &format!("{}(HitKind())", super::ray::MAP_FRONT_FACE_NAME),
+                crate::BuiltIn::FrontFacing => {
+                    &format!("{}(HitKind())", super::ray::MAP_FRONT_FACE_NAME)
+                }
                 crate::BuiltIn::PrimitiveIndex => "PrimitiveIndex()",
             };
             writeln!(self.out, "{call};")?;
