@@ -386,4 +386,5 @@ pub struct Writer<'a, W> {
     temp_access_chain: Vec<storage::SubAccess>,
     need_bake_expressions: back::NeedBakeExpressions,
     written_wrapper_structs: crate::FastHashSet<crate::Handle<crate::Type>>,
+    written_wrapper_struct_constructors: crate::FastHashSet<crate::Handle<crate::Type>>,
 }

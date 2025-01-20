@@ -821,6 +821,7 @@ pub const RESERVED: &[&str] = &[
     super::writer::EXTRACT_BITS_FUNCTION,
     super::writer::INSERT_BITS_FUNCTION,
     super::writer::INTERSECTION_VARIABLE,
+    super::writer::WRAPPED_INTERSECTION_VARIABLE,
     super::writer::PAYLOAD_VARIABLE,
     super::ray::MAP_HIT_NAME,
     super::ray::MAP_FRONT_FACE_NAME,

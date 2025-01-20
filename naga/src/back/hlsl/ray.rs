@@ -213,7 +213,8 @@ impl<W: Write> super::Writer<'_, W> {
                         match *inner {
                             TypeInner::Struct { .. } => {}
                             _ => {
-                                self.write_wrapper_struct(module, intersection_ty)?
+                                // We need the constructor which also writes the struct.
+                                self.write_wrapper_struct_constructor(module, intersection_ty)?
                             }
                         }
                         // There may only be one type for a given function

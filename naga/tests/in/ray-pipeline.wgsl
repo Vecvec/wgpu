@@ -56,3 +56,13 @@ fn intersect_return() {
     let has_accepted = ReportIntersection(0.5, 5u, 0u);
     return;
 }
+
+struct Container {
+    inner: u32,
+}
+
+@intersection
+fn intersect_struct() {
+    let has_accepted = ReportIntersection(0.5, 5u, Container(0u));
+    return;
+}

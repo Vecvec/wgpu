@@ -27,6 +27,7 @@ pub(crate) const EXTRACT_BITS_FUNCTION: &str = "naga_extractBits";
 pub(crate) const INSERT_BITS_FUNCTION: &str = "naga_insertBits";
 pub(crate) const PAYLOAD_VARIABLE: &str = "naga_payload";
 pub(crate) const INTERSECTION_VARIABLE: &str = "naga_intersection";
+pub(crate) const WRAPPED_INTERSECTION_VARIABLE: &str = "naga_intersection_wrapped";
 pub(crate) const WRAPPER_STRUCT_START: &str = "NagaWrapperStructFor";
 
 struct EpStructMember {
@@ -116,6 +117,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             temp_access_chain: Vec::new(),
             need_bake_expressions: Default::default(),
             written_wrapper_structs: Default::default(),
+            written_wrapper_struct_constructors: Default::default(),
         }
     }
 
@@ -1468,11 +1470,12 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     write!(self.out, ", in ",)?;
                     if let TypeInner::Struct { .. } = module.types[ty].inner {
                         self.write_type(module, ty)?;
+                        write!(self.out, " {}", name,)?;
                     } else {
-                        write!(self.out, "{}", super::help::get_wrapper_struct_name(ty))?;
+                        write!(self.out, "{} {WRAPPED_INTERSECTION_VARIABLE}", super::help::get_wrapper_struct_name(ty))?;
+                        deferred_builtins.push((crate::BuiltIn::Intersection, name.to_string(), ty))
                     }
 
-                    write!(self.out, " {}", name,)?;
                 }
                 if let Some(ref ep_input) = self.entry_point_io[ep_index as usize].input {
                     write!(self.out, "{} {}", ep_input.ty_name, ep_input.arg_name)?;
@@ -1585,8 +1588,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 | crate::BuiltIn::SubgroupId
                 | crate::BuiltIn::SubgroupSize
                 | crate::BuiltIn::SubgroupInvocationId
-                | crate::BuiltIn::Payload
-                | crate::BuiltIn::Intersection => {
+                | crate::BuiltIn::Payload => {
                     unreachable!("{:?} should never be deferred", deferred_builtin)
                 }
                 crate::BuiltIn::LaunchId => "DispatchRayIndex()",
@@ -1612,6 +1614,10 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     &temp_string
                 }
                 crate::BuiltIn::PrimitiveIndex => "PrimitiveIndex()",
+                crate::BuiltIn::Intersection => {
+                    temp_string = format!("{WRAPPED_INTERSECTION_VARIABLE}.inner");
+                    &temp_string
+                }
             };
             writeln!(self.out, "{call};")?;
         }
@@ -2580,15 +2586,16 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     ref hit_t,
                     ref hit_type,
                     ref intersection,
+                    ref intersection_ty,
                     ..
                 } => {
                     write!(self.out, "ReportHit(")?;
                     self.write_expr(module, *hit_t, func_ctx)?;
                     write!(self.out, ", ")?;
                     self.write_expr(module, *hit_type, func_ctx)?;
-                    write!(self.out, ", ")?;
+                    write!(self.out, ", {}Construct(", super::help::get_wrapper_struct_name(*intersection_ty))?;
                     self.write_expr(module, *intersection, func_ctx)?;
-                    write!(self.out, ");")?;
+                    write!(self.out, "));")?;
                 }
             },
             Statement::SubgroupBallot { result, predicate } => {

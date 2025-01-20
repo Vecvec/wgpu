@@ -38,5 +38,9 @@
             entry_point:"intersect_return",
             target_profile:"lib_6_5",
         ),
+        (
+            entry_point:"intersect_struct",
+            target_profile:"lib_6_5",
+        ),
     ],
 )

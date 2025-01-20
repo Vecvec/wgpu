@@ -55,6 +55,10 @@ struct TriRayIntersection {
     int _end_pad_34;
 };
 
+struct Container {
+    uint inner;
+};
+
 RayDesc RayDescFromRayDesc_(RayDesc_ arg0) {
     RayDesc ret = (RayDesc)0;
     ret.Origin = arg0.origin;
@@ -122,8 +126,21 @@ void miss(inout float4 colour_4)
 
 NagaWrapperStructFor3 {
 uint inner,}
+NagaWrapperStructFor3 NagaWrapperStructFor3Construct(uint inner) {NagaWrapperStructFor3 ret = (NagaWrapperStructFor3)0;ret.inner = inner;return ret;}
 [shader("intersection")]
 void intersect_return()
 {
-ReportHit(0.5, 5u, 0u);    return;
+ReportHit(0.5, 5u, NagaWrapperStructFor3Construct(0u));    return;
+}
+
+Container ConstructContainer(uint arg0) {
+    Container ret = (Container)0;
+    ret.inner = arg0;
+    return ret;
+}
+
+[shader("intersection")]
+void intersect_struct()
+{
+ReportHit(0.5, 5u, NagaWrapperStructFor9Construct(ConstructContainer(0u)));    return;
 }
