@@ -1586,7 +1586,14 @@ fn uniform_control_flow() {
     let stmt_discard_hit = S::DiscardHit;
     assert_eq!(
         info.process_block(
-            &vec![stmt_emit4, stmt_assign, stmt_kill, stmt_return_pointer, stmt_discard_hit].into(),
+            &vec![
+                stmt_emit4,
+                stmt_assign,
+                stmt_kill,
+                stmt_return_pointer,
+                stmt_discard_hit
+            ]
+            .into(),
             &[],
             Some(UniformityDisruptor::Discard),
             &expressions,
