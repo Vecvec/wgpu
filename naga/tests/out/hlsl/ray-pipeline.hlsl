@@ -67,7 +67,7 @@ void discard_any_hit(inout NagaWrapperStructForfloat4 naga_payload_wrapped, in B
     float4 colour_1 = naga_payload_wrapped.inner;
     colour_1 = ZeroValuefloat4();
     naga_payload_wrapped.inner = colour_1;
-    discard;
+    IgnoreHit();
 }
 
 [shader("anyhit")]

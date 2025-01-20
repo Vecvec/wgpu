@@ -1705,7 +1705,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         // Write the function body (statement list)
         for sta in func.body.iter() {
             // The indentation should always be 1 when writing the function body
-            self.write_stmt(module, sta, func_ctx, back::Level(1), append_return.as_ref().map(|str| str.as_str()))?;
+            self.write_stmt(module, sta, func_ctx, back::Level(1), append_return.as_deref())?;
         }
 
         writeln!(self.out, "}}")?;
@@ -1987,6 +1987,12 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     writeln!(self.out, "{append}")?;
                 }
                 writeln!(self.out, "{level}discard;")?
+            }
+            Statement::DiscardHit => {
+                if let Some(append) = append_return {
+                    writeln!(self.out, "{append}")?;
+                }
+                writeln!(self.out, "{level}IgnoreHit();")?
             }
             Statement::Return { value: None } => {
                 if let Some(append) = append_return {

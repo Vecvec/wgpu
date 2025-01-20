@@ -314,7 +314,6 @@ impl Writer {
         ir_module: &crate::Module,
         mut interface: Option<FunctionInterface>,
         debug_info: &Option<DebugInfoInner>,
-        stage: Option<crate::ShaderStage>,
     ) -> Result<(Word, Box<[Word]>), Error> {
         log::trace!("Generating code for {:?}", ir_function.name);
         let mut function = Function::default();
@@ -726,7 +725,7 @@ impl Writer {
             next_id
         };
 
-        context.write_function_body(main_id, debug_info.as_ref(), stage)?;
+        context.write_function_body(main_id, debug_info.as_ref())?;
 
         // Consume the `BlockContext`, ending its borrows and letting the
         // `Writer` steal back its cached expression table and temp_list.
@@ -771,7 +770,6 @@ impl Writer {
                 stage: entry_point.stage,
             }),
             debug_info,
-            Some(entry_point.stage),
         )?;
         if self.physical_layout.version >= 0x10400 {
             interface_ids.append(&mut ray_global_vars.to_vec());
@@ -2192,7 +2190,7 @@ impl Writer {
                 }
             }
             let id =
-                self.write_function(ir_function, info, ir_module, None, &debug_info_inner, None)?;
+                self.write_function(ir_function, info, ir_module, None, &debug_info_inner)?;
             self.lookup_function.insert(handle, id.0);
             self.lookup_ray_global_variables.insert(handle, id.1);
         }

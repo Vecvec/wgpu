@@ -2381,6 +2381,7 @@ impl<'a, W: Write> Writer<'a, W> {
             // keyword which ceases all further processing in a fragment shader, it's called OpKill
             // in spir-v that's why it's called `Statement::Kill`
             Statement::Kill => writeln!(self.out, "{level}discard;")?,
+            Statement::DiscardHit => unreachable!("ray-tracing not supported"),
             Statement::Barrier(flags) => {
                 self.write_barrier(flags, level)?;
             }

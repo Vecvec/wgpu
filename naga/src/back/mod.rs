@@ -278,7 +278,8 @@ impl crate::Statement {
             crate::Statement::Break
             | crate::Statement::Continue
             | crate::Statement::Return { .. }
-            | crate::Statement::Kill => true,
+            | crate::Statement::Kill
+            | crate::Statement::DiscardHit => true,
             _ => false,
         }
     }

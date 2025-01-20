@@ -289,6 +289,7 @@ pub enum StatementKind<'a> {
         value: Option<Handle<Expression<'a>>>,
     },
     Kill,
+    DiscardHit,
     Call {
         function: Ident<'a>,
         arguments: Vec<Handle<Expression<'a>>>,

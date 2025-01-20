@@ -739,6 +739,10 @@ impl<W: Write> Writer<W> {
                 write!(self.out, "{level}")?;
                 writeln!(self.out, "discard;")?
             }
+            Statement::DiscardHit => {
+                write!(self.out, "{level}")?;
+                writeln!(self.out, "discard_hit;")?
+            }
             Statement::Store { pointer, value } => {
                 write!(self.out, "{level}")?;
 

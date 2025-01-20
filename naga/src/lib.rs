@@ -1967,6 +1967,9 @@ pub enum Statement {
     /// [`Loop`]: Statement::Loop
     Kill,
 
+    /// Discards the current hit.
+    DiscardHit,
+
     /// Synchronize invocations within the work group.
     /// The `Barrier` flags control which memory accesses should be synchronized.
     /// If empty, this becomes purely an execution barrier.

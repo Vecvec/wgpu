@@ -972,7 +972,11 @@ impl super::Validator {
                     finished = true;
                 }
                 S::Kill => {
-                    stages &= super::ShaderStages::FRAGMENT | super::ShaderStages::ANY_HIT;
+                    stages &= super::ShaderStages::FRAGMENT;
+                    finished = true;
+                }
+                S::DiscardHit => {
+                    stages &= super::ShaderStages::ANY_HIT;
                     finished = true;
                 }
                 S::Barrier(barrier) => {

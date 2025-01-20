@@ -4486,6 +4486,7 @@ impl<I: Iterator<Item = u32>> Frontend<I> {
                 | S::Continue
                 | S::Return { .. }
                 | S::Kill
+                | S::DiscardHit
                 | S::Barrier(_)
                 | S::Store { .. }
                 | S::ImageStore { .. }

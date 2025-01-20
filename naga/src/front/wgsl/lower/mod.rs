@@ -1663,6 +1663,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 crate::Statement::Return { value }
             }
             ast::StatementKind::Kill => crate::Statement::Kill,
+            ast::StatementKind::DiscardHit => crate::Statement::DiscardHit,
             ast::StatementKind::Call {
                 ref function,
                 ref arguments,

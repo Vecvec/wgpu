@@ -16,6 +16,7 @@
                 requirements: (""),
             ),
             may_kill: false,
+            may_discard_hit: false,
             sampling_set: [],
             global_uses: [
                 ("READ"),

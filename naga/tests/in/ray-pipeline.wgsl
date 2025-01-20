@@ -26,7 +26,7 @@ fn trace() {
 @ray_any
 fn discard_any_hit(@builtin(payload) colour: ptr<ray_tracing, vec4<f32>>, @builtin(intersection) intersection: TriRayIntersection) {
     *colour = vec4<f32>();
-    discard;
+    discard_hit;
 }
 /* in glsl `@builtin(payload) colour: ptr<private, vec4<f32>>` is
 `layout(location = 0) rayPayloadInEXT vec4<f32> colour;`

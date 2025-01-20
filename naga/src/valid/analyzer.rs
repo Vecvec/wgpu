@@ -74,6 +74,11 @@ bitflags::bitflags! {
         ///
         /// [`Statement::Kill`]: crate::Statement::Kill
         const MAY_KILL = 0x2;
+        /// Control flow may be killed. Anything after [`Statement::DiscardHit`] is
+        /// considered inside non-uniform context.
+        ///
+        /// [`Statement::DiscardHit`]: crate::Statement::DiscardHit
+        const MAY_DISCARD_HIT = 0x4;
     }
 }
 
@@ -114,6 +119,8 @@ impl FunctionUniformity {
             Some(UniformityDisruptor::Return)
         } else if self.exit.contains(ExitFlags::MAY_KILL) {
             Some(UniformityDisruptor::Discard)
+        } else if self.exit.contains(ExitFlags::MAY_DISCARD_HIT) {
+            Some(UniformityDisruptor::DiscardHit)
         } else {
             None
         }
@@ -246,6 +253,8 @@ pub struct FunctionInfo {
     pub uniformity: Uniformity,
     /// Function may kill the invocation.
     pub may_kill: bool,
+    /// Function may discard the any_hit invocation.
+    pub may_discard_hit: bool,
 
     /// All pairs of (texture, sampler) globals that may be used together in
     /// sampling operations by this function and its callees. This includes
@@ -347,6 +356,8 @@ pub enum UniformityDisruptor {
     Return,
     #[error("There is a Discard earlier in the entry point across all called functions")]
     Discard,
+    #[error("There is a Discard hit earlier in the entry point across all called functions")]
+    DiscardHit,
 }
 
 impl FunctionInfo {
@@ -520,6 +531,9 @@ impl FunctionInfo {
             result: callee.uniformity.clone(),
             exit: if callee.may_kill {
                 ExitFlags::MAY_KILL
+            // This is only allowed in a different shader stage.
+            } else if callee.may_discard_hit {
+                ExitFlags::MAY_DISCARD_HIT
             } else {
                 ExitFlags::empty()
             },
@@ -929,6 +943,14 @@ impl FunctionInfo {
                         ExitFlags::empty()
                     },
                 },
+                S::DiscardHit => FunctionUniformity {
+                    result: Uniformity::new(),
+                    exit: if disruptor.is_some() {
+                        ExitFlags::MAY_DISCARD_HIT
+                    } else {
+                        ExitFlags::empty()
+                    },
+                },
                 S::Barrier(_) => FunctionUniformity {
                     result: Uniformity {
                         non_uniform_result: None,
@@ -1261,6 +1283,7 @@ impl ModuleInfo {
             intersection_reported_type: None,
             uniformity: Uniformity::new(),
             may_kill: false,
+            may_discard_hit: false,
             sampling_set: crate::FastHashSet::default(),
             global_uses: vec![GlobalUse::empty(); module.global_variables.len()].into_boxed_slice(),
             expressions: vec![ExpressionInfo::new(); fun.expressions.len()].into_boxed_slice(),
@@ -1299,6 +1322,7 @@ impl ModuleInfo {
         )?;
         info.uniformity = uniformity.result;
         info.may_kill = uniformity.exit.contains(ExitFlags::MAY_KILL);
+        info.may_discard_hit = uniformity.exit.contains(ExitFlags::MAY_DISCARD_HIT);
 
         Ok(info)
     }
@@ -1383,6 +1407,7 @@ fn uniform_control_flow() {
         intersection_reported_type: None,
         uniformity: Uniformity::new(),
         may_kill: false,
+        may_discard_hit: false,
         sampling_set: crate::FastHashSet::default(),
         global_uses: vec![GlobalUse::empty(); global_var_arena.len()].into_boxed_slice(),
         expressions: vec![ExpressionInfo::new(); expressions.len()].into_boxed_slice(),

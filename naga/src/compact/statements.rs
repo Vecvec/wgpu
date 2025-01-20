@@ -155,7 +155,8 @@ impl FunctionTracer<'_> {
                     | St::Continue
                     | St::Kill
                     | St::Barrier(_)
-                    | St::Return { value: None } => {}
+                    | St::Return { value: None }
+                    | St::DiscardHit => {}
                 }
             }
         }
@@ -388,7 +389,8 @@ impl FunctionMap {
                     | St::Continue
                     | St::Kill
                     | St::Barrier(_)
-                    | St::Return { value: None } => {}
+                    | St::Return { value: None }
+                    | St::DiscardHit => {}
                 }
             }
         }

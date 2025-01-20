@@ -26,6 +26,7 @@
                 requirements: (""),
             ),
             may_kill: false,
+            may_discard_hit: false,
             sampling_set: [
                 (
                     image: 0,
@@ -426,6 +427,7 @@
                 requirements: (""),
             ),
             may_kill: false,
+            may_discard_hit: false,
             sampling_set: [
                 (
                     image: 0,
@@ -1590,6 +1592,7 @@
                 requirements: (""),
             ),
             may_kill: false,
+            may_discard_hit: false,
             sampling_set: [
                 (
                     image: 0,

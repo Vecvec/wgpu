@@ -2299,7 +2299,6 @@ impl BlockContext<'_> {
         exit: BlockExit,
         loop_context: LoopContext,
         debug_info: Option<&DebugInfoInner>,
-        stage: Option<crate::ShaderStage>,
     ) -> Result<BlockExitDisposition, Error> {
         let mut block = Block::new(label_id);
         for (statement, span) in naga_block.span_iter() {
@@ -2312,7 +2311,8 @@ impl BlockContext<'_> {
                         | Statement::Continue
                         | Statement::Kill
                         | Statement::Return { .. }
-                        | Statement::Loop { .. })
+                        | Statement::Loop { .. }
+                        | Statement::DiscardHit)
                 ),
             ) {
                 let loc: crate::SourceLocation = span.location(debug_info.source_code);
@@ -2342,7 +2342,6 @@ impl BlockContext<'_> {
                         BlockExit::Branch { target: merge_id },
                         loop_context,
                         debug_info,
-                        stage,
                     )?;
 
                     match merge_used {
@@ -2398,7 +2397,6 @@ impl BlockContext<'_> {
                             BlockExit::Branch { target: merge_id },
                             loop_context,
                             debug_info,
-                            stage,
                         )?;
                     }
                     if let Some(block_id) = reject_id {
@@ -2412,7 +2410,6 @@ impl BlockContext<'_> {
                             BlockExit::Branch { target: merge_id },
                             loop_context,
                             debug_info,
-                            stage,
                         )?;
                     }
 
@@ -2501,7 +2498,6 @@ impl BlockContext<'_> {
                             },
                             inner_context,
                             debug_info,
-                            stage,
                         )?;
                     }
 
@@ -2554,7 +2550,6 @@ impl BlockContext<'_> {
                             break_id: Some(merge_id),
                         },
                         debug_info,
-                        stage,
                     )?;
 
                     let exit = match break_if {
@@ -2579,7 +2574,6 @@ impl BlockContext<'_> {
                             break_id: Some(merge_id),
                         },
                         debug_info,
-                        stage,
                     )?;
 
                     block = Block::new(merge_id);
@@ -2620,11 +2614,11 @@ impl BlockContext<'_> {
                     return Ok(BlockExitDisposition::Discarded);
                 }
                 Statement::Kill => {
-                    if let Some(crate::ShaderStage::AnyHit) = stage {
-                        self.function.consume(block, Instruction::ignore_hit());
-                    } else {
-                        self.function.consume(block, Instruction::kill());
-                    }
+                    self.function.consume(block, Instruction::kill());
+                    return Ok(BlockExitDisposition::Discarded);
+                }
+                Statement::DiscardHit => {
+                    self.function.consume(block, Instruction::ignore_hit());
                     return Ok(BlockExitDisposition::Discarded);
                 }
                 Statement::Barrier(flags) => {
@@ -3075,7 +3069,6 @@ impl BlockContext<'_> {
         &mut self,
         entry_id: Word,
         debug_info: Option<&DebugInfoInner>,
-        stage: Option<crate::ShaderStage>,
     ) -> Result<(), Error> {
         // We can ignore the `BlockExitDisposition` returned here because
         // `BlockExit::Return` doesn't refer to a block.
@@ -3085,7 +3078,6 @@ impl BlockContext<'_> {
             BlockExit::Return,
             LoopContext::default(),
             debug_info,
-            stage,
         )?;
 
         Ok(())
