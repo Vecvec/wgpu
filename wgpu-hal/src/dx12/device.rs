@@ -1241,6 +1241,7 @@ impl crate::Device for super::Device {
                 push_constants_target,
                 zero_initialize_workgroup_memory: true,
                 restrict_indexing: true,
+                ep_options: Vec::new(),
             },
         })
     }

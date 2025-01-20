@@ -27,6 +27,7 @@ pub(crate) const EXTRACT_BITS_FUNCTION: &str = "naga_extractBits";
 pub(crate) const INSERT_BITS_FUNCTION: &str = "naga_insertBits";
 pub(crate) const PAYLOAD_VARIABLE: &str = "naga_payload";
 pub(crate) const INTERSECTION_VARIABLE: &str = "naga_intersection";
+pub(crate) const WRAPPER_STRUCT_START: &str = "NagaWrapperStructFor";
 
 struct EpStructMember {
     name: String,
@@ -114,6 +115,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             continue_ctx: back::continue_forward::ContinueCtx::default(),
             temp_access_chain: Vec::new(),
             need_bake_expressions: Default::default(),
+            written_wrapper_structs: Default::default(),
         }
     }
 
@@ -402,6 +404,33 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             };
 
             self.write_wrapped_functions(module, &ctx)?;
+
+            self.write_wrapper_struct_from_block(module, &ep.function.body)?;
+
+            if let ShaderStage::AnyHit | ShaderStage::ClosestHit | ShaderStage::Miss =
+                ep.stage
+            {
+                for argument in ep.function.arguments.iter() {
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::HitKind)) = argument.binding
+                    {
+                        self.write_map_hit()?;
+                    }
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::FrontFacing)) =
+                        argument.binding
+                    {
+                        self.write_map_front_face()?;
+                    }
+                    // Can only happen in closest and any hit shaders.
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Intersection)) =
+                        argument.binding
+                    {
+                        match module.types[argument.ty].inner {
+                            TypeInner::Struct { .. } => {}
+                            _ => self.write_wrapper_struct(module, argument.ty)?,
+                        }
+                    }
+                }
+            }
 
             match ep.stage {
                 ShaderStage::Vertex | ShaderStage::Fragment => {}
@@ -1276,7 +1305,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 base,
                 space: crate::AddressSpace::RayTracing,
             } => {
-                write!(self.out, "inout")?;
+                write!(self.out, "inout ")?;
                 self.write_type(module, base)?;
             }
             _ => return Err(Error::Unimplemented(format!("write_value_type {inner:?}"))),
@@ -1312,36 +1341,6 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         }) = func.result
         {
             self.write_modifier(binding)?;
-        }
-
-        if let back::FunctionType::EntryPoint(ep_index) = func_ctx.ty {
-            if let ShaderStage::AnyHit
-            | ShaderStage::ClosestHit
-            | ShaderStage::Intersection
-            | ShaderStage::Miss = module.entry_points[ep_index as usize].stage
-            {
-                let mut needs_hit_map = false;
-                let mut needs_front_face_map = false;
-                for argument in func.arguments.iter() {
-                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::HitKind)) = argument.binding
-                    {
-                        needs_hit_map = true;
-                    }
-                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::FrontFacing)) =
-                        argument.binding
-                    {
-                        needs_front_face_map = true;
-                    }
-                }
-
-                if needs_hit_map {
-                    self.write_map_hit()?;
-                }
-
-                if needs_front_face_map {
-                    self.write_map_front_face()?;
-                }
-            }
         }
 
         // Write return type
@@ -1402,8 +1401,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             }
             back::FunctionType::EntryPoint(ep_index) => {
                 let stage = module.entry_points[ep_index as usize].stage;
-                let mut payload_name = None;
-                let mut intersection_name = None;
+                let mut payload_name_ty = None;
+                let mut intersection_name_ty = None;
                 if self.entry_point_io[ep_index as usize].input.is_none() {
                     for (index, arg) in func.arguments.iter().enumerate() {
                         let argument_name =
@@ -1411,34 +1410,69 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                         // there can only be one builtin of each type
                         if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Payload)) = arg.binding
                         {
-                            payload_name = Some(argument_name.clone());
+                            payload_name_ty = Some((argument_name.clone(), arg.ty));
                         }
                         if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Intersection)) =
                             arg.binding
                         {
-                            intersection_name = Some(argument_name.clone());
+                            intersection_name_ty = Some((argument_name.clone(), arg.ty));
                         }
                     }
                 }
+                let ep_name = module.entry_points[ep_index as usize].name.clone();
                 if let ShaderStage::AnyHit
                 | ShaderStage::ClosestHit
-                | ShaderStage::Intersection
                 | ShaderStage::Miss = stage
                 {
-                    write!(
-                        self.out,
-                        "inout {}",
-                        payload_name.unwrap_or(PAYLOAD_VARIABLE.to_string())
-                    )?;
+                    let name = payload_name_ty
+                        .as_ref()
+                        .map_or(PAYLOAD_VARIABLE, |&(ref name, _)| name.as_str());
+                    let ty = payload_name_ty
+                        .as_ref()
+                        .map(|&(_, ty)| ty)
+                        .or(info.payload_type)
+                        .or_else(|| {
+                            self.options
+                                .ep_options
+                                .iter()
+                                .find_map(|option| {
+                                    (option.name == ep_name).then_some(option.payload_type)
+                                })
+                                .flatten()
+                        })
+                        .ok_or(Error::CannotInferPayload(ep_name.clone()))?;
+                    self.write_type(module, ty)?;
+                    write!(self.out, " {}", name,)?;
                 }
-                if let ShaderStage::AnyHit | ShaderStage::ClosestHit | ShaderStage::Intersection =
+                if let ShaderStage::AnyHit | ShaderStage::ClosestHit =
                     stage
                 {
-                    write!(
-                        self.out,
-                        ", in {}",
-                        intersection_name.unwrap_or(INTERSECTION_VARIABLE.to_string())
-                    )?;
+                    let name = intersection_name_ty
+                        .as_ref()
+                        .map_or(INTERSECTION_VARIABLE, |&(ref name, _)| name.as_str());
+                    let ty = intersection_name_ty
+                        .as_ref()
+                        .map(|&(_, ty)| ty)
+                        .or(info.intersection_reported_type)
+                        .or_else(|| {
+                            self.options
+                                .ep_options
+                                .iter()
+                                .find_map(|option| {
+                                    (option.name == ep_name).then_some(option.intersection_type)
+                                })
+                                .flatten()
+                        })
+                        .ok_or(Error::CannotInferIntersection(ep_name))?;
+
+                    write!(self.out, ", in ",)?;
+                    if let TypeInner::Struct { .. } = module.types[ty].inner {
+                        self.write_type(module, ty)?;
+                    } else {
+                        write!(self.out, "{}", super::help::get_wrapper_struct_name(ty))?;
+                    }
+
+                    write!(self.out, " {}", name,)?;
                 }
                 if let Some(ref ep_input) = self.entry_point_io[ep_index as usize].input {
                     write!(self.out, "{} {}", ep_input.ty_name, ep_input.arg_name)?;

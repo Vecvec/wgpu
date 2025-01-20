@@ -1396,4 +1396,23 @@ impl<W: Write> super::Writer<'_, W> {
 
         Ok(())
     }
+    pub(super) fn write_wrapper_struct(&mut self, module: &crate::Module, ty: Handle<crate::Type>) -> BackendResult {
+        if self.written_wrapper_structs.contains(&ty) {
+            return Ok(());
+        }
+        self.written_wrapper_structs.insert(ty);
+        writeln!(self.out, "{} {{\
+", get_wrapper_struct_name(ty))?;
+        self.write_type(module, ty)?;
+        writeln!(
+            self.out,
+            " inner,\
+}}"
+        )?;
+        Ok(())
+    }
+}
+
+pub(super) fn get_wrapper_struct_name(ty: Handle<crate::Type>) -> String {
+    format!("{}{}", super::writer::WRAPPER_STRUCT_START, ty.index())
 }

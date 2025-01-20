@@ -1,5 +1,5 @@
 use crate::back::hlsl::BackendResult;
-use crate::{RayQueryIntersection, TypeInner};
+use crate::{RayQueryIntersection, Statement, TypeInner};
 use std::fmt::Write;
 
 pub const MAP_HIT_NAME: &str = "map_hit";
@@ -198,6 +198,49 @@ impl<W: Write> super::Writer<'_, W> {
 }}\
 "
         )?;
+        Ok(())
+    }
+    pub(super) fn write_wrapper_struct_from_block(&mut self, module: &crate::Module, block: &crate::Block) -> BackendResult {
+        let mut blocks = Vec::new();
+        blocks.push(block);
+        // Prefer no recursion if possible - naga has issues with it and this might make it worse.
+        // We don't need to have a particular order so we can just use a normal Vec.
+        while let Some(block) = blocks.pop() {
+            for statement in block.iter() {
+                match *statement {
+                    Statement::RayTracing { fun: crate::RayTracingFunction::ReportIntersection { intersection_ty, ..} } => {
+                        let inner = &module.types[intersection_ty].inner;
+                        match *inner {
+                            TypeInner::Struct { .. } => {}
+                            _ => {
+                                self.write_wrapper_struct(module, intersection_ty)?
+                            }
+                        }
+                        // There may only be one type for a given function
+                        return Ok(());
+                    }
+                    Statement::Block(ref block) => blocks.push(block),
+                    Statement::If { ref accept, ref reject , ..} => {
+                        blocks.push(accept);
+                        blocks.push(reject);
+                    }
+                    Statement::Call { function, ..} => {
+                        let fun_block = &module.functions[function].body;
+                        blocks.push(fun_block);
+                    }
+                    Statement::Loop { ref body, ref continuing,  .. } => {
+                        blocks.push(body);
+                        blocks.push(continuing);
+                    },
+                    Statement::Switch { ref cases, .. } => {
+                        for case in cases.iter() {
+                            blocks.push(&case.body)
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
         Ok(())
     }
 }

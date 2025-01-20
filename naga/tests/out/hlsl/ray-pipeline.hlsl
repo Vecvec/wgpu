@@ -91,14 +91,14 @@ TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0
 }
 
 [shader("anyhit")]
-void discard_any_hit(inout colour_1, in intersection)
+void discard_any_hit(inout float4 colour_1, in BuiltInTriangleIntersectionAttributes intersection)
 {
     colour_1 = ZeroValuefloat4();
     discard;
 }
 
 [shader("anyhit")]
-void any_hit(inout colour_2, in intersection_1)
+void any_hit(inout float4 colour_2, in BuiltInTriangleIntersectionAttributes intersection_1)
 {
 float t = RayTCurrent();
     colour_2 = ZeroValuefloat4();
@@ -106,7 +106,7 @@ float t = RayTCurrent();
 }
 
 [shader("closesthit")]
-void closest_hit(inout colour_3, in intersection_2)
+void closest_hit(inout float4 colour_3, in BuiltInTriangleIntersectionAttributes intersection_2)
 {
 float t_1 = RayTCurrent();
     colour_3 = (1.0).xxxx;
@@ -114,14 +114,16 @@ float t_1 = RayTCurrent();
 }
 
 [shader("miss")]
-void miss(inout colour_4)
+void miss(inout float4 colour_4)
 {
     colour_4 = ZeroValuefloat4();
     return;
 }
 
+NagaWrapperStructFor3 {
+uint inner,}
 [shader("intersection")]
-void intersect_return(inout naga_payload, in naga_intersection)
+void intersect_return()
 {
 ReportHit(0.5, 5u, 0u);    return;
 }

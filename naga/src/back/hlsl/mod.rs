@@ -216,6 +216,24 @@ pub struct Options {
     pub zero_initialize_workgroup_memory: bool,
     /// Should we restrict indexing of vectors, matrices and arrays?
     pub restrict_indexing: bool,
+    /// Option about entry points
+    pub ep_options: Vec<EntryOptions>,
+}
+
+/// Configuration used in the [`Writer`].
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize))]
+#[cfg_attr(feature = "deserialize", derive(serde::Deserialize))]
+#[cfg_attr(feature = "deserialize", serde(default))]
+pub struct EntryOptions {
+    /// The name of the entry point
+    pub name: String,
+    /// The handle a type for the ray-tracing payload (only needed if
+    /// validation has not run and there is no builtin payload)
+    pub payload_type: Option<crate::Handle<crate::Type>>,
+    /// The handle a type for the ray-tracing intersection info (only
+    /// needed if validation has not run and there is no builtin payload)
+    pub intersection_type: Option<crate::Handle<crate::Type>>,
 }
 
 impl Default for Options {
@@ -228,6 +246,7 @@ impl Default for Options {
             push_constants_target: None,
             zero_initialize_workgroup_memory: true,
             restrict_indexing: true,
+            ep_options: Vec::new(),
         }
     }
 }
@@ -273,6 +292,10 @@ pub enum Error {
     Custom(String),
     #[error("overrides should not be present at this stage")]
     Override,
+    #[error("Validation was not enabled, no builtin was present and no payload was provided in options for entry {0:?}")]
+    CannotInferPayload(String),
+    #[error("Validation was not enabled, no builtin was present and no intersection was provided in options for entry {0:?}")]
+    CannotInferIntersection(String),
 }
 
 #[derive(Default)]
@@ -362,4 +385,5 @@ pub struct Writer<'a, W> {
     /// [`AccessIndex`]: crate::Expression::AccessIndex
     temp_access_chain: Vec<storage::SubAccess>,
     need_bake_expressions: back::NeedBakeExpressions,
+    written_wrapper_structs: crate::FastHashSet<crate::Handle<crate::Type>>,
 }
