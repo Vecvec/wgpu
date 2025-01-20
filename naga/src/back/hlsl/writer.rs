@@ -1089,6 +1089,11 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         span: u32,
         shader_stage: Option<(ShaderStage, Io)>,
     ) -> BackendResult {
+        if let Some(tri_ray_intersection) = module.special_types.tri_ray_intersection {
+            if tri_ray_intersection == handle {
+                return Ok(());
+            }
+        }
         // Write struct name
         let struct_name = &self.names[&NameKey::Type(handle)];
         writeln!(self.out, "struct {struct_name} {{")?;

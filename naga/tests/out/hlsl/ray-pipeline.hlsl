@@ -9,51 +9,6 @@ struct RayDesc_ {
     int _end_pad_0;
 };
 
-struct TriRayIntersection {
-    int _pad0_0;
-    int _pad0_1;
-    int _pad0_2;
-    int _pad0_3;
-    int _pad0_4;
-    int _pad0_5;
-    int _pad0_6;
-    float2 barycentrics;
-    int _end_pad_0;
-    int _end_pad_1;
-    int _end_pad_2;
-    int _end_pad_3;
-    int _end_pad_4;
-    int _end_pad_5;
-    int _end_pad_6;
-    int _end_pad_7;
-    int _end_pad_8;
-    int _end_pad_9;
-    int _end_pad_10;
-    int _end_pad_11;
-    int _end_pad_12;
-    int _end_pad_13;
-    int _end_pad_14;
-    int _end_pad_15;
-    int _end_pad_16;
-    int _end_pad_17;
-    int _end_pad_18;
-    int _end_pad_19;
-    int _end_pad_20;
-    int _end_pad_21;
-    int _end_pad_22;
-    int _end_pad_23;
-    int _end_pad_24;
-    int _end_pad_25;
-    int _end_pad_26;
-    int _end_pad_27;
-    int _end_pad_28;
-    int _end_pad_29;
-    int _end_pad_30;
-    int _end_pad_31;
-    int _end_pad_32;
-    int _end_pad_33;
-    int _end_pad_34;
-};
 
 struct Container {
     uint inner;
