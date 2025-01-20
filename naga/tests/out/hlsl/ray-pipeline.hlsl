@@ -79,8 +79,8 @@ void miss(inout float4 colour_4)
     return;
 }
 
-NagaWrapperStructFor3 {
-uint inner,}
+struct NagaWrapperStructFor3 {
+uint inner,};
 NagaWrapperStructFor3 NagaWrapperStructFor3Construct(uint inner) {NagaWrapperStructFor3 ret = (NagaWrapperStructFor3)0;ret.inner = inner;return ret;}
 [shader("intersection")]
 void intersect_return()

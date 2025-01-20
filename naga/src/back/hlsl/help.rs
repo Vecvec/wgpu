@@ -1401,13 +1401,12 @@ impl<W: Write> super::Writer<'_, W> {
             return Ok(());
         }
         self.written_wrapper_structs.insert(ty);
-        writeln!(self.out, "{} {{\
-", get_wrapper_struct_name(ty))?;
+        writeln!(self.out, "struct {} {{", get_wrapper_struct_name(ty))?;
         self.write_type(module, ty)?;
         writeln!(
             self.out,
             " inner,\
-}}"
+}};"
         )?;
         Ok(())
     }
