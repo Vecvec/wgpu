@@ -1414,7 +1414,8 @@ impl<W: Write> super::Writer<'_, W> {
         writeln!(
             self.out,
             " inner;
-}};")?;
+}};"
+        )?;
         Ok(())
     }
 

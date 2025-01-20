@@ -1709,7 +1709,13 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         // Write the function body (statement list)
         for sta in func.body.iter() {
             // The indentation should always be 1 when writing the function body
-            self.write_stmt(module, sta, func_ctx, back::Level(1), append_return.as_deref())?;
+            self.write_stmt(
+                module,
+                sta,
+                func_ctx,
+                back::Level(1),
+                append_return.as_deref(),
+            )?;
         }
 
         writeln!(self.out, "}}")?;

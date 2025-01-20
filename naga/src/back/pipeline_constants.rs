@@ -848,7 +848,11 @@ fn adjust_stmt(new_pos: &HandleVec<Expression, Handle<Expression>>, stmt: &mut S
                 adjust(result)
             }
         },
-        Statement::Break | Statement::Continue | Statement::Kill | Statement::Barrier(_) | Statement::DiscardHit => {}
+        Statement::Break
+        | Statement::Continue
+        | Statement::Kill
+        | Statement::Barrier(_)
+        | Statement::DiscardHit => {}
     }
 }
 

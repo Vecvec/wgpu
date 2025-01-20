@@ -2189,8 +2189,7 @@ impl Writer {
                     continue;
                 }
             }
-            let id =
-                self.write_function(ir_function, info, ir_module, None, &debug_info_inner)?;
+            let id = self.write_function(ir_function, info, ir_module, None, &debug_info_inner)?;
             self.lookup_function.insert(handle, id.0);
             self.lookup_ray_global_variables.insert(handle, id.1);
         }
