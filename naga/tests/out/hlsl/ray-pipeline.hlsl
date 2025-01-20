@@ -37,15 +37,22 @@ void trace()
 {
     float4 colour_5 = ZeroValuefloat4();
 
-TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), colour_5);    return;
+     NagaWrapperStructFor2 NagaWrapperStructFor2Temp = NagaWrapperStructFor2Construct(colour_5);
+    TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), NagaWrapperStructFor2Temp);
+    return;
 }
 
+struct NagaWrapperStructFor2 {
+float4 inner,};
+NagaWrapperStructFor2 NagaWrapperStructFor2Construct(float4 inner) {NagaWrapperStructFor2 ret = (NagaWrapperStructFor2)0;ret.inner = inner;return ret;}
 [shader("raygeneration")]
 void ray_gen()
 {
     float4 colour = ZeroValuefloat4();
 
-TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), colour);    trace();
+     NagaWrapperStructFor2 NagaWrapperStructFor2Temp = NagaWrapperStructFor2Construct(colour);
+    TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), NagaWrapperStructFor2Temp);
+    trace();
     return;
 }
 
@@ -85,7 +92,8 @@ NagaWrapperStructFor3 NagaWrapperStructFor3Construct(uint inner) {NagaWrapperStr
 [shader("intersection")]
 void intersect_return()
 {
-ReportHit(0.5, 5u, NagaWrapperStructFor3Construct(0u));    return;
+    ReportHit(0.5, 5u,NagaWrapperStructFor3Construct(0u));
+    return;
 }
 
 Container ConstructContainer(uint arg0) {
@@ -97,5 +105,6 @@ Container ConstructContainer(uint arg0) {
 [shader("intersection")]
 void intersect_struct()
 {
-ReportHit(0.5, 5u, NagaWrapperStructFor9Construct(ConstructContainer(0u)));    return;
+    ReportHit(0.5, 5u,ConstructContainer(0u));
+    return;
 }

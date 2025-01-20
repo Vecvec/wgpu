@@ -2557,9 +2557,20 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     ref descriptor,
                     ref payload,
                     ref acceleration_structure,
+                    payload_ty,
                     ..
                 } => {
-                    write!(self.out, "TraceRay(")?;
+                    let payload_inner = &module.types[payload_ty].inner;
+                    match *payload_inner {
+                        TypeInner::Struct { .. } => {}
+                        _ => {
+                            let payload_wrapper_name = super::help::get_wrapper_struct_name(payload_ty);
+                            write!(self.out, "{level} {payload_wrapper_name} {payload_wrapper_name}Temp = {payload_wrapper_name}Construct(")?;
+                            self.write_expr(module, *payload, func_ctx)?;
+                            writeln!(self.out, ");")?;
+                        }
+                    }
+                    write!(self.out, "{level}TraceRay(")?;
                     self.write_expr(module, *acceleration_structure, func_ctx)?;
                     write!(self.out, ", ")?;
                     self.write_expr(module, *descriptor, func_ctx)?;
@@ -2574,8 +2585,21 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     write!(self.out, "RayDescFromRayDesc_(")?;
                     self.write_expr(module, *descriptor, func_ctx)?;
                     write!(self.out, "), ")?;
-                    self.write_expr(module, *payload, func_ctx)?;
-                    write!(self.out, ");")?;
+                    match *payload_inner {
+                        TypeInner::Struct { .. } => {
+                            self.write_expr(module, *payload, func_ctx)?;
+                            writeln!(self.out, ");")?;
+                        }
+                        _ => {
+                            let payload_wrapper_name = super::help::get_wrapper_struct_name(payload_ty);
+                            writeln!(self.out, "{payload_wrapper_name}Temp);")?;
+                            if self.named_expressions.contains_key(payload) {
+                                write!(self.out, "{level}")?;
+                                self.write_expr(module, *payload, func_ctx)?;
+                                writeln!(self.out, " = {payload_wrapper_name}.inner")?;
+                            }
+                        }
+                    }
                 }
                 RayTracingFunction::ReportIntersection {
                     ref hit_t,
@@ -2584,13 +2608,24 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     ref intersection_ty,
                     ..
                 } => {
+                    let intersection_inner = &module.types[*intersection_ty].inner;
+                    write!(self.out, "{level}")?;
                     write!(self.out, "ReportHit(")?;
                     self.write_expr(module, *hit_t, func_ctx)?;
                     write!(self.out, ", ")?;
                     self.write_expr(module, *hit_type, func_ctx)?;
-                    write!(self.out, ", {}Construct(", super::help::get_wrapper_struct_name(*intersection_ty))?;
-                    self.write_expr(module, *intersection, func_ctx)?;
-                    write!(self.out, "));")?;
+                    write!(self.out, ",")?;
+                    match *intersection_inner {
+                        TypeInner::Struct { .. } => {
+                            self.write_expr(module, *intersection, func_ctx)?;
+                        }
+                        _ => {
+                            write!(self.out, "{}Construct(", super::help::get_wrapper_struct_name(*intersection_ty))?;
+                            self.write_expr(module, *intersection, func_ctx)?;
+                            write!(self.out, ")")?;
+                        }
+                    }
+                    writeln!(self.out, ");")?;
                 }
             },
             Statement::SubgroupBallot { result, predicate } => {

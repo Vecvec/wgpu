@@ -208,18 +208,20 @@ impl<W: Write> super::Writer<'_, W> {
         while let Some(block) = blocks.pop() {
             for statement in block.iter() {
                 match *statement {
-                    Statement::RayTracing { fun: crate::RayTracingFunction::ReportIntersection { intersection_ty, ..} } => {
-                        let inner = &module.types[intersection_ty].inner;
+                    Statement::RayTracing { ref fun } => {
+                        let handle = match *fun {
+                            crate::RayTracingFunction::TraceRay { payload_ty, .. } => payload_ty,
+                            crate::RayTracingFunction::ReportIntersection { intersection_ty, .. } => intersection_ty,
+                        };
+                        let inner = &module.types[handle].inner;
                         match *inner {
                             TypeInner::Struct { .. } => {}
                             _ => {
                                 // We need the constructor which also writes the struct.
-                                self.write_wrapper_struct_constructor(module, intersection_ty)?
+                                self.write_wrapper_struct_constructor(module, handle)?
                             }
                         }
-                        // There may only be one type for a given function
-                        return Ok(());
-                    }
+                    },
                     Statement::Block(ref block) => blocks.push(block),
                     Statement::If { ref accept, ref reject , ..} => {
                         blocks.push(accept);
