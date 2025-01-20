@@ -1396,12 +1396,20 @@ impl<W: Write> super::Writer<'_, W> {
 
         Ok(())
     }
-    pub(super) fn write_wrapper_struct(&mut self, module: &crate::Module, ty: Handle<crate::Type>) -> BackendResult {
+    pub(super) fn write_wrapper_struct(
+        &mut self,
+        module: &crate::Module,
+        ty: Handle<crate::Type>,
+    ) -> BackendResult {
         if self.written_wrapper_structs.contains(&ty) {
             return Ok(());
         }
         self.written_wrapper_structs.insert(ty);
-        writeln!(self.out, "struct {} {{", self.get_wrapper_struct_name(module, ty)?)?;
+        writeln!(
+            self.out,
+            "struct {} {{",
+            self.get_wrapper_struct_name(module, ty)?
+        )?;
         self.write_type(module, ty)?;
         writeln!(
             self.out,
@@ -1411,7 +1419,11 @@ impl<W: Write> super::Writer<'_, W> {
         Ok(())
     }
 
-    pub(super) fn write_wrapper_struct_constructor(&mut self, module: &crate::Module, ty: Handle<crate::Type>) -> BackendResult {
+    pub(super) fn write_wrapper_struct_constructor(
+        &mut self,
+        module: &crate::Module,
+        ty: Handle<crate::Type>,
+    ) -> BackendResult {
         if self.written_wrapper_struct_constructors.contains(&ty) {
             return Ok(());
         }
@@ -1420,15 +1432,23 @@ impl<W: Write> super::Writer<'_, W> {
         let name = self.get_wrapper_struct_name(module, ty)?;
         write!(self.out, "{} {}Construct(", name, name)?;
         self.write_type(module, ty)?;
-        writeln!(self.out, " inner) {{\
+        writeln!(
+            self.out,
+            " inner) {{\
     {} ret = ({})0;\
     ret.inner = inner;\
     return ret;\
-}}", name, name)?;
+}}",
+            name, name
+        )?;
         Ok(())
     }
 
-    pub(super) fn get_wrapper_struct_name(&self, module: &crate::Module, ty: Handle<crate::Type>) -> Result<String, super::Error> {
+    pub(super) fn get_wrapper_struct_name(
+        &self,
+        module: &crate::Module,
+        ty: Handle<crate::Type>,
+    ) -> Result<String, super::Error> {
         let name = crate::TypeInner::hlsl_type_id(ty, module.to_ctx(), &self.names)?;
         Ok(format!("{}{}", super::writer::WRAPPER_STRUCT_START, name))
     }

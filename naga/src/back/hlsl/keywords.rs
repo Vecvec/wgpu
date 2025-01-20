@@ -913,6 +913,4 @@ pub const TYPES: &[&str] = &{
     res
 };
 
-pub const RESERVED_PREFIXES: &[&str] = &[
-    super::writer::WRAPPER_STRUCT_START
-];
+pub const RESERVED_PREFIXES: &[&str] = &[super::writer::WRAPPER_STRUCT_START];

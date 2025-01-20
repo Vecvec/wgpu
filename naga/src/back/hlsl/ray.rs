@@ -200,7 +200,11 @@ impl<W: Write> super::Writer<'_, W> {
         )?;
         Ok(())
     }
-    pub(super) fn write_wrapper_struct_from_block(&mut self, module: &crate::Module, block: &crate::Block) -> BackendResult {
+    pub(super) fn write_wrapper_struct_from_block(
+        &mut self,
+        module: &crate::Module,
+        block: &crate::Block,
+    ) -> BackendResult {
         let mut blocks = Vec::new();
         blocks.push(block);
         // Prefer no recursion if possible - naga has issues with it and this might make it worse.
@@ -211,7 +215,10 @@ impl<W: Write> super::Writer<'_, W> {
                     Statement::RayTracing { ref fun } => {
                         let handle = match *fun {
                             crate::RayTracingFunction::TraceRay { payload_ty, .. } => payload_ty,
-                            crate::RayTracingFunction::ReportIntersection { intersection_ty, .. } => intersection_ty,
+                            crate::RayTracingFunction::ReportIntersection {
+                                intersection_ty,
+                                ..
+                            } => intersection_ty,
                         };
                         let inner = &module.types[handle].inner;
                         match *inner {
@@ -221,20 +228,28 @@ impl<W: Write> super::Writer<'_, W> {
                                 self.write_wrapper_struct_constructor(module, handle)?
                             }
                         }
-                    },
+                    }
                     Statement::Block(ref block) => blocks.push(block),
-                    Statement::If { ref accept, ref reject , ..} => {
+                    Statement::If {
+                        ref accept,
+                        ref reject,
+                        ..
+                    } => {
                         blocks.push(accept);
                         blocks.push(reject);
                     }
-                    Statement::Call { function, ..} => {
+                    Statement::Call { function, .. } => {
                         let fun_block = &module.functions[function].body;
                         blocks.push(fun_block);
                     }
-                    Statement::Loop { ref body, ref continuing,  .. } => {
+                    Statement::Loop {
+                        ref body,
+                        ref continuing,
+                        ..
+                    } => {
                         blocks.push(body);
                         blocks.push(continuing);
-                    },
+                    }
                     Statement::Switch { ref cases, .. } => {
                         for case in cases.iter() {
                             blocks.push(&case.body)

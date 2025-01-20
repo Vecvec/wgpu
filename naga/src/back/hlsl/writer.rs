@@ -410,9 +410,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
 
             self.write_wrapper_struct_from_block(module, &ep.function.body)?;
 
-            if let ShaderStage::AnyHit | ShaderStage::ClosestHit | ShaderStage::Miss =
-                ep.stage
-            {
+            if let ShaderStage::AnyHit | ShaderStage::ClosestHit | ShaderStage::Miss = ep.stage {
                 for argument in ep.function.arguments.iter() {
                     if let Some(crate::Binding::BuiltIn(crate::BuiltIn::HitKind)) = argument.binding
                     {
@@ -432,11 +430,10 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                             _ => self.write_wrapper_struct(module, argument.ty)?,
                         }
                     }
-                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Payload)) =
-                        argument.binding {
-                        let TypeInner::Pointer {
-                            base, ..
-                        } = module.types[argument.ty].inner else {
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Payload)) = argument.binding
+                    {
+                        let TypeInner::Pointer { base, .. } = module.types[argument.ty].inner
+                        else {
                             unreachable!("The payload is required to be a ptr");
                         };
                         match module.types[base].inner {
@@ -1440,10 +1437,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     }
                 }
                 let ep_name = module.entry_points[ep_index as usize].name.clone();
-                if let ShaderStage::AnyHit
-                | ShaderStage::ClosestHit
-                | ShaderStage::Miss = stage
-                {
+                if let ShaderStage::AnyHit | ShaderStage::ClosestHit | ShaderStage::Miss = stage {
                     let name = payload_name_ty
                         .as_ref()
                         .map_or(PAYLOAD_VARIABLE, |&(ref name, _)| name.as_str());
@@ -1461,22 +1455,22 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                                 .flatten()
                         })
                         .ok_or(Error::CannotInferPayload(ep_name.clone()))?;
-                    let TypeInner::Pointer {
-                        base, ..
-                    } = module.types[ty].inner else {
+                    let TypeInner::Pointer { base, .. } = module.types[ty].inner else {
                         unreachable!("The payload is required to be a ptr");
                     };
                     if let TypeInner::Struct { .. } = module.types[base].inner {
                         self.write_type(module, ty)?;
                         write!(self.out, " {}", name,)?;
                     } else {
-                        write!(self.out, "inout {} {WRAPPED_PAYLOAD_VARIABLE}", self.get_wrapper_struct_name(module, base)?)?;
+                        write!(
+                            self.out,
+                            "inout {} {WRAPPED_PAYLOAD_VARIABLE}",
+                            self.get_wrapper_struct_name(module, base)?
+                        )?;
                         deferred_builtins.push((crate::BuiltIn::Payload, name.to_string(), base))
                     }
                 }
-                if let ShaderStage::AnyHit | ShaderStage::ClosestHit =
-                    stage
-                {
+                if let ShaderStage::AnyHit | ShaderStage::ClosestHit = stage {
                     let name = intersection_name_ty
                         .as_ref()
                         .map_or(INTERSECTION_VARIABLE, |&(ref name, _)| name.as_str());
@@ -1500,10 +1494,13 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                         self.write_type(module, ty)?;
                         write!(self.out, " {}", name,)?;
                     } else {
-                        write!(self.out, "{} {WRAPPED_INTERSECTION_VARIABLE}", self.get_wrapper_struct_name(module, ty)?)?;
+                        write!(
+                            self.out,
+                            "{} {WRAPPED_INTERSECTION_VARIABLE}",
+                            self.get_wrapper_struct_name(module, ty)?
+                        )?;
                         deferred_builtins.push((crate::BuiltIn::Intersection, name.to_string(), ty))
                     }
-
                 }
                 if let Some(ref ep_input) = self.entry_point_io[ep_index as usize].input {
                     write!(self.out, "{} {}", ep_input.ty_name, ep_input.arg_name)?;
@@ -1703,7 +1700,11 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         }
 
         if let Some(payload_name) = payload_name {
-            writeln!(self.out, "{}{WRAPPED_PAYLOAD_VARIABLE}.inner = {payload_name}", back::Level(1))?;
+            writeln!(
+                self.out,
+                "{}{WRAPPED_PAYLOAD_VARIABLE}.inner = {payload_name}",
+                back::Level(1)
+            )?;
         }
 
         writeln!(self.out, "}}")?;
@@ -2601,7 +2602,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     match *payload_inner {
                         TypeInner::Struct { .. } => {}
                         _ => {
-                            let payload_wrapper_name = self.get_wrapper_struct_name(module, payload_ty)?;
+                            let payload_wrapper_name =
+                                self.get_wrapper_struct_name(module, payload_ty)?;
                             write!(self.out, "{level}{payload_wrapper_name} {payload_wrapper_name}Temp = {payload_wrapper_name}Construct(")?;
                             self.write_expr(module, *payload, func_ctx)?;
                             writeln!(self.out, ");")?;
@@ -2628,7 +2630,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                             writeln!(self.out, ");")?;
                         }
                         _ => {
-                            let payload_wrapper_name = self.get_wrapper_struct_name(module, payload_ty)?;
+                            let payload_wrapper_name =
+                                self.get_wrapper_struct_name(module, payload_ty)?;
                             writeln!(self.out, "{payload_wrapper_name}Temp);")?;
                             if self.named_expressions.contains_key(payload) {
                                 write!(self.out, "{level}")?;
@@ -2657,7 +2660,11 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                             self.write_expr(module, *intersection, func_ctx)?;
                         }
                         _ => {
-                            write!(self.out, "{}Construct(", self.get_wrapper_struct_name(module, *intersection_ty)?)?;
+                            write!(
+                                self.out,
+                                "{}Construct(",
+                                self.get_wrapper_struct_name(module, *intersection_ty)?
+                            )?;
                             self.write_expr(module, *intersection, func_ctx)?;
                             write!(self.out, ")")?;
                         }
