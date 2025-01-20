@@ -1413,9 +1413,8 @@ impl<W: Write> super::Writer<'_, W> {
         self.write_type(module, ty)?;
         writeln!(
             self.out,
-            " inner,\
-}};"
-        )?;
+            " inner;
+}};")?;
         Ok(())
     }
 
@@ -1434,10 +1433,10 @@ impl<W: Write> super::Writer<'_, W> {
         self.write_type(module, ty)?;
         writeln!(
             self.out,
-            " inner) {{\
-    {} ret = ({})0;\
-    ret.inner = inner;\
-    return ret;\
+            " inner) {{
+    {} ret = ({})0;
+    ret.inner = inner;
+    return ret;
 }}",
             name, name
         )?;

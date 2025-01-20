@@ -1693,18 +1693,19 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             writeln!(self.out)?;
         }
 
+        let mut append_return = None;
+
+        if let Some(payload_name) = payload_name {
+            append_return = Some(format!(
+                "{}{WRAPPED_PAYLOAD_VARIABLE}.inner = {payload_name};",
+                back::Level(1)
+            ));
+        }
+
         // Write the function body (statement list)
         for sta in func.body.iter() {
             // The indentation should always be 1 when writing the function body
-            self.write_stmt(module, sta, func_ctx, back::Level(1))?;
-        }
-
-        if let Some(payload_name) = payload_name {
-            writeln!(
-                self.out,
-                "{}{WRAPPED_PAYLOAD_VARIABLE}.inner = {payload_name}",
-                back::Level(1)
-            )?;
+            self.write_stmt(module, sta, func_ctx, back::Level(1), append_return.as_ref().map(|str| str.as_str()))?;
         }
 
         writeln!(self.out, "}}")?;
@@ -1761,6 +1762,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         level: back::Level,
         selector: Handle<crate::Expression>,
         cases: &[crate::SwitchCase],
+        append_return: Option<&str>,
     ) -> BackendResult {
         // Write all cases
         let indent_level_1 = level.next();
@@ -1788,7 +1790,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             // Body
             if let Some(case) = cases.last() {
                 for sta in case.body.iter() {
-                    self.write_stmt(module, sta, func_ctx, indent_level_1)?;
+                    self.write_stmt(module, sta, func_ctx, indent_level_1, append_return)?;
                 }
             }
             // End do-while
@@ -1854,7 +1856,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                         writeln!(self.out, "{indent_level_2}{{")?;
                         let prev_len = self.named_expressions.len();
                         for sta in case.body.iter() {
-                            self.write_stmt(module, sta, func_ctx, indent_level_3)?;
+                            self.write_stmt(module, sta, func_ctx, indent_level_3, append_return)?;
                         }
                         // Clear all named expressions that were previously inserted by the statements in the block
                         self.named_expressions.truncate(prev_len);
@@ -1867,7 +1869,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     }
                 } else {
                     for sta in case.body.iter() {
-                        self.write_stmt(module, sta, func_ctx, indent_level_2)?;
+                        self.write_stmt(module, sta, func_ctx, indent_level_2, append_return)?;
                     }
                     if !case.fall_through && case.body.last().map_or(true, |s| !s.is_terminator()) {
                         writeln!(self.out, "{indent_level_2}break;")?;
@@ -1908,6 +1910,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         stmt: &crate::Statement,
         func_ctx: &back::FunctionCtx<'_>,
         level: back::Level,
+        append_return: Option<&str>,
     ) -> BackendResult {
         use crate::Statement;
 
@@ -1944,7 +1947,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 writeln!(self.out, "{{")?;
                 for sta in block.iter() {
                     // Increase the indentation to help with readability
-                    self.write_stmt(module, sta, func_ctx, level.next())?
+                    self.write_stmt(module, sta, func_ctx, level.next(), append_return)?
                 }
                 writeln!(self.out, "{level}}}")?
             }
@@ -1962,7 +1965,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 let l2 = level.next();
                 for sta in accept {
                     // Increase indentation to help with readability
-                    self.write_stmt(module, sta, func_ctx, l2)?;
+                    self.write_stmt(module, sta, func_ctx, l2, append_return)?;
                 }
 
                 // If there are no statements in the reject block we skip writing it
@@ -1972,18 +1975,29 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
 
                     for sta in reject {
                         // Increase indentation to help with readability
-                        self.write_stmt(module, sta, func_ctx, l2)?;
+                        self.write_stmt(module, sta, func_ctx, l2, append_return)?;
                     }
                 }
 
                 writeln!(self.out, "{level}}}")?
             }
             // TODO: copy-paste from glsl-out
-            Statement::Kill => writeln!(self.out, "{level}discard;")?,
+            Statement::Kill => {
+                if let Some(append) = append_return {
+                    writeln!(self.out, "{append}")?;
+                }
+                writeln!(self.out, "{level}discard;")?
+            }
             Statement::Return { value: None } => {
+                if let Some(append) = append_return {
+                    writeln!(self.out, "{append}")?;
+                }
                 writeln!(self.out, "{level}return;")?;
             }
             Statement::Return { value: Some(expr) } => {
+                if let Some(append) = append_return {
+                    writeln!(self.out, "{append}")?;
+                }
                 let base_ty_res = &func_ctx.info[expr].ty;
                 let mut resolved = base_ty_res.inner_with(&module.types);
                 if let TypeInner::Pointer { base, space: _ } = *resolved {
@@ -2350,7 +2364,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     writeln!(self.out, "{l2}if (!{gate_name}) {{")?;
                     let l3 = l2.next();
                     for sta in continuing.iter() {
-                        self.write_stmt(module, sta, func_ctx, l3)?;
+                        self.write_stmt(module, sta, func_ctx, l3, append_return)?;
                     }
                     if let Some(condition) = break_if {
                         write!(self.out, "{l3}if (")?;
@@ -2366,7 +2380,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 }
 
                 for sta in body.iter() {
-                    self.write_stmt(module, sta, func_ctx, l2)?;
+                    self.write_stmt(module, sta, func_ctx, l2, append_return)?;
                 }
                 writeln!(self.out, "{level}}}")?;
                 self.continue_ctx.exit_loop();
@@ -2557,7 +2571,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 selector,
                 ref cases,
             } => {
-                self.write_switch(module, func_ctx, level, selector, cases)?;
+                self.write_switch(module, func_ctx, level, selector, cases, append_return)?;
             }
             Statement::RayQuery { query, ref fun } => match *fun {
                 RayQueryFunction::Initialize {

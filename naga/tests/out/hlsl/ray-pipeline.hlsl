@@ -43,8 +43,13 @@ void trace()
 }
 
 struct NagaWrapperStructForfloat4 {
-float4 inner,};
-NagaWrapperStructForfloat4 NagaWrapperStructForfloat4Construct(float4 inner) {NagaWrapperStructForfloat4 ret = (NagaWrapperStructForfloat4)0;ret.inner = inner;return ret;}
+float4 inner;
+};
+NagaWrapperStructForfloat4 NagaWrapperStructForfloat4Construct(float4 inner) {
+    NagaWrapperStructForfloat4 ret = (NagaWrapperStructForfloat4)0;
+    ret.inner = inner;
+    return ret;
+}
 [shader("raygeneration")]
 void ray_gen()
 {
@@ -61,8 +66,8 @@ void discard_any_hit(inout NagaWrapperStructForfloat4 naga_payload_wrapped, in B
 {
     float4 colour_1 = naga_payload_wrapped.inner;
     colour_1 = ZeroValuefloat4();
+    naga_payload_wrapped.inner = colour_1;
     discard;
-    naga_payload_wrapped.inner = colour_1
 }
 
 [shader("anyhit")]
@@ -71,8 +76,8 @@ void any_hit(inout NagaWrapperStructForfloat4 naga_payload_wrapped, in BuiltInTr
     float4 colour_2 = naga_payload_wrapped.inner;
     float t = RayTCurrent();
     colour_2 = ZeroValuefloat4();
+    naga_payload_wrapped.inner = colour_2;
     return;
-    naga_payload_wrapped.inner = colour_2
 }
 
 [shader("closesthit")]
@@ -81,8 +86,8 @@ void closest_hit(inout NagaWrapperStructForfloat4 naga_payload_wrapped, in Built
     float4 colour_3 = naga_payload_wrapped.inner;
     float t_1 = RayTCurrent();
     colour_3 = (1.0).xxxx;
+    naga_payload_wrapped.inner = colour_3;
     return;
-    naga_payload_wrapped.inner = colour_3
 }
 
 [shader("miss")]
@@ -90,13 +95,18 @@ void miss(inout NagaWrapperStructForfloat4 naga_payload_wrapped)
 {
     float4 colour_4 = naga_payload_wrapped.inner;
     colour_4 = ZeroValuefloat4();
+    naga_payload_wrapped.inner = colour_4;
     return;
-    naga_payload_wrapped.inner = colour_4
 }
 
 struct NagaWrapperStructForuint {
-uint inner,};
-NagaWrapperStructForuint NagaWrapperStructForuintConstruct(uint inner) {NagaWrapperStructForuint ret = (NagaWrapperStructForuint)0;ret.inner = inner;return ret;}
+uint inner;
+};
+NagaWrapperStructForuint NagaWrapperStructForuintConstruct(uint inner) {
+    NagaWrapperStructForuint ret = (NagaWrapperStructForuint)0;
+    ret.inner = inner;
+    return ret;
+}
 [shader("intersection")]
 void intersect_return()
 {
