@@ -1831,7 +1831,7 @@ pub enum RayTracingFunction {
         descriptor: Handle<Expression>,
         /// A pointer to a user defined payload
         payload: Handle<Expression>,
-        /// the type the payload contains
+        /// The type that the payload pointer contains.
         payload_ty: Handle<Type>,
     },
 }

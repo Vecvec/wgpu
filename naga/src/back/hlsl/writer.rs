@@ -26,6 +26,7 @@ pub(crate) const FREXP_FUNCTION: &str = "naga_frexp";
 pub(crate) const EXTRACT_BITS_FUNCTION: &str = "naga_extractBits";
 pub(crate) const INSERT_BITS_FUNCTION: &str = "naga_insertBits";
 pub(crate) const PAYLOAD_VARIABLE: &str = "naga_payload";
+pub(crate) const WRAPPED_PAYLOAD_VARIABLE: &str = "naga_payload_wrapped";
 pub(crate) const INTERSECTION_VARIABLE: &str = "naga_intersection";
 pub(crate) const WRAPPED_INTERSECTION_VARIABLE: &str = "naga_intersection_wrapped";
 pub(crate) const WRAPPER_STRUCT_START: &str = "NagaWrapperStructFor";
@@ -429,6 +430,18 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                         match module.types[argument.ty].inner {
                             TypeInner::Struct { .. } => {}
                             _ => self.write_wrapper_struct(module, argument.ty)?,
+                        }
+                    }
+                    if let Some(crate::Binding::BuiltIn(crate::BuiltIn::Payload)) =
+                        argument.binding {
+                        let TypeInner::Pointer {
+                            base, ..
+                        } = module.types[argument.ty].inner else {
+                            unreachable!("The payload is required to be a ptr");
+                        };
+                        match module.types[base].inner {
+                            TypeInner::Struct { .. } => {}
+                            _ => self.write_wrapper_struct(module, base)?,
                         }
                     }
                 }
@@ -1448,8 +1461,18 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                                 .flatten()
                         })
                         .ok_or(Error::CannotInferPayload(ep_name.clone()))?;
-                    self.write_type(module, ty)?;
-                    write!(self.out, " {}", name,)?;
+                    let TypeInner::Pointer {
+                        base, ..
+                    } = module.types[ty].inner else {
+                        unreachable!("The payload is required to be a ptr");
+                    };
+                    if let TypeInner::Struct { .. } = module.types[base].inner {
+                        self.write_type(module, ty)?;
+                        write!(self.out, " {}", name,)?;
+                    } else {
+                        write!(self.out, "inout {} {WRAPPED_PAYLOAD_VARIABLE}", self.get_wrapper_struct_name(module, base)?)?;
+                        deferred_builtins.push((crate::BuiltIn::Payload, name.to_string(), base))
+                    }
                 }
                 if let ShaderStage::AnyHit | ShaderStage::ClosestHit =
                     stage
@@ -1477,7 +1500,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                         self.write_type(module, ty)?;
                         write!(self.out, " {}", name,)?;
                     } else {
-                        write!(self.out, "{} {WRAPPED_INTERSECTION_VARIABLE}", super::help::get_wrapper_struct_name(ty))?;
+                        write!(self.out, "{} {WRAPPED_INTERSECTION_VARIABLE}", self.get_wrapper_struct_name(module, ty)?)?;
                         deferred_builtins.push((crate::BuiltIn::Intersection, name.to_string(), ty))
                     }
 
@@ -1565,7 +1588,13 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
             self.write_ep_arguments_initialization(module, func, index)?;
         }
 
+        // Will only be Some if
+        //  1. There is able to be a payload builtin
+        //  2. The payload type is not a struct.
+        let mut payload_name = None;
+
         for (deferred_builtin, name, ty) in deferred_builtins {
+            write!(self.out, "{}", back::Level(1))?;
             self.write_type(module, ty)?;
             write!(self.out, " {name} = ")?;
             let temp_string;
@@ -1592,8 +1621,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 | crate::BuiltIn::NumSubgroups
                 | crate::BuiltIn::SubgroupId
                 | crate::BuiltIn::SubgroupSize
-                | crate::BuiltIn::SubgroupInvocationId
-                | crate::BuiltIn::Payload => {
+                | crate::BuiltIn::SubgroupInvocationId => {
                     unreachable!("{:?} should never be deferred", deferred_builtin)
                 }
                 crate::BuiltIn::LaunchId => "DispatchRayIndex()",
@@ -1621,6 +1649,11 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 crate::BuiltIn::PrimitiveIndex => "PrimitiveIndex()",
                 crate::BuiltIn::Intersection => {
                     temp_string = format!("{WRAPPED_INTERSECTION_VARIABLE}.inner");
+                    &temp_string
+                }
+                crate::BuiltIn::Payload => {
+                    payload_name = Some(name);
+                    temp_string = format!("{WRAPPED_PAYLOAD_VARIABLE}.inner");
                     &temp_string
                 }
             };
@@ -1667,6 +1700,10 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         for sta in func.body.iter() {
             // The indentation should always be 1 when writing the function body
             self.write_stmt(module, sta, func_ctx, back::Level(1))?;
+        }
+
+        if let Some(payload_name) = payload_name {
+            writeln!(self.out, "{}{WRAPPED_PAYLOAD_VARIABLE}.inner = {payload_name}", back::Level(1))?;
         }
 
         writeln!(self.out, "}}")?;
@@ -2564,8 +2601,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                     match *payload_inner {
                         TypeInner::Struct { .. } => {}
                         _ => {
-                            let payload_wrapper_name = super::help::get_wrapper_struct_name(payload_ty);
-                            write!(self.out, "{level} {payload_wrapper_name} {payload_wrapper_name}Temp = {payload_wrapper_name}Construct(")?;
+                            let payload_wrapper_name = self.get_wrapper_struct_name(module, payload_ty)?;
+                            write!(self.out, "{level}{payload_wrapper_name} {payload_wrapper_name}Temp = {payload_wrapper_name}Construct(")?;
                             self.write_expr(module, *payload, func_ctx)?;
                             writeln!(self.out, ");")?;
                         }
@@ -2591,7 +2628,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                             writeln!(self.out, ");")?;
                         }
                         _ => {
-                            let payload_wrapper_name = super::help::get_wrapper_struct_name(payload_ty);
+                            let payload_wrapper_name = self.get_wrapper_struct_name(module, payload_ty)?;
                             writeln!(self.out, "{payload_wrapper_name}Temp);")?;
                             if self.named_expressions.contains_key(payload) {
                                 write!(self.out, "{level}")?;
@@ -2620,7 +2657,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                             self.write_expr(module, *intersection, func_ctx)?;
                         }
                         _ => {
-                            write!(self.out, "{}Construct(", super::help::get_wrapper_struct_name(*intersection_ty))?;
+                            write!(self.out, "{}Construct(", self.get_wrapper_struct_name(module, *intersection_ty)?)?;
                             self.write_expr(module, *intersection, func_ctx)?;
                             write!(self.out, ")")?;
                         }

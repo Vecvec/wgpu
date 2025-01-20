@@ -37,62 +37,70 @@ void trace()
 {
     float4 colour_5 = ZeroValuefloat4();
 
-     NagaWrapperStructFor2 NagaWrapperStructFor2Temp = NagaWrapperStructFor2Construct(colour_5);
-    TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), NagaWrapperStructFor2Temp);
+    NagaWrapperStructForfloat4 NagaWrapperStructForfloat4Temp = NagaWrapperStructForfloat4Construct(colour_5);
+    TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), NagaWrapperStructForfloat4Temp);
     return;
 }
 
-struct NagaWrapperStructFor2 {
+struct NagaWrapperStructForfloat4 {
 float4 inner,};
-NagaWrapperStructFor2 NagaWrapperStructFor2Construct(float4 inner) {NagaWrapperStructFor2 ret = (NagaWrapperStructFor2)0;ret.inner = inner;return ret;}
+NagaWrapperStructForfloat4 NagaWrapperStructForfloat4Construct(float4 inner) {NagaWrapperStructForfloat4 ret = (NagaWrapperStructForfloat4)0;ret.inner = inner;return ret;}
 [shader("raygeneration")]
 void ray_gen()
 {
     float4 colour = ZeroValuefloat4();
 
-     NagaWrapperStructFor2 NagaWrapperStructFor2Temp = NagaWrapperStructFor2Construct(colour);
-    TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), NagaWrapperStructFor2Temp);
+    NagaWrapperStructForfloat4 NagaWrapperStructForfloat4Temp = NagaWrapperStructForfloat4Construct(colour);
+    TraceRay(acc_struct, ZeroValueRayDesc_().flags, ZeroValueRayDesc_().cull_mask, 0, 0, 0, RayDescFromRayDesc_(ZeroValueRayDesc_()), NagaWrapperStructForfloat4Temp);
     trace();
     return;
 }
 
 [shader("anyhit")]
-void discard_any_hit(inout float4 colour_1, in BuiltInTriangleIntersectionAttributes intersection)
+void discard_any_hit(inout NagaWrapperStructForfloat4 naga_payload_wrapped, in BuiltInTriangleIntersectionAttributes intersection)
 {
+    float4 colour_1 = naga_payload_wrapped.inner;
     colour_1 = ZeroValuefloat4();
     discard;
+    naga_payload_wrapped.inner = colour_1
 }
 
 [shader("anyhit")]
-void any_hit(inout float4 colour_2, in BuiltInTriangleIntersectionAttributes intersection_1)
+void any_hit(inout NagaWrapperStructForfloat4 naga_payload_wrapped, in BuiltInTriangleIntersectionAttributes intersection_1)
 {
-float t = RayTCurrent();
+    float4 colour_2 = naga_payload_wrapped.inner;
+    float t = RayTCurrent();
     colour_2 = ZeroValuefloat4();
     return;
+    naga_payload_wrapped.inner = colour_2
 }
 
 [shader("closesthit")]
-void closest_hit(inout float4 colour_3, in BuiltInTriangleIntersectionAttributes intersection_2)
+void closest_hit(inout NagaWrapperStructForfloat4 naga_payload_wrapped, in BuiltInTriangleIntersectionAttributes intersection_2)
 {
-float t_1 = RayTCurrent();
+    float4 colour_3 = naga_payload_wrapped.inner;
+    float t_1 = RayTCurrent();
     colour_3 = (1.0).xxxx;
     return;
+    naga_payload_wrapped.inner = colour_3
 }
 
 [shader("miss")]
-void miss(inout float4 colour_4)
+void miss(inout NagaWrapperStructForfloat4 naga_payload_wrapped)
 {
+    float4 colour_4 = naga_payload_wrapped.inner;
     colour_4 = ZeroValuefloat4();
     return;
+    naga_payload_wrapped.inner = colour_4
 }
 
-struct NagaWrapperStructFor3 {
+struct NagaWrapperStructForuint {
 uint inner,};
-NagaWrapperStructFor3 NagaWrapperStructFor3Construct(uint inner) {NagaWrapperStructFor3 ret = (NagaWrapperStructFor3)0;ret.inner = inner;return ret;}
+NagaWrapperStructForuint NagaWrapperStructForuintConstruct(uint inner) {NagaWrapperStructForuint ret = (NagaWrapperStructForuint)0;ret.inner = inner;return ret;}
 [shader("intersection")]
 void intersect_return()
 {
-    ReportHit(0.5, 5u,NagaWrapperStructFor3Construct(0u));
+    ReportHit(0.5, 5u,NagaWrapperStructForuintConstruct(0u));
     return;
 }
 
