@@ -3144,7 +3144,7 @@ impl<W: Write> Writer<W> {
                 crate::Statement::Kill => {
                     writeln!(self.out, "{level}{NAMESPACE}::discard_fragment();")?;
                 }
-                crate::Statement::DiscardHit => unreachable!("ray-tracing pipeline unspported"),
+                crate::Statement::DiscardHit => unreachable!("ray-tracing pipeline unsupported"),
                 crate::Statement::Barrier(flags) => {
                     self.write_barrier(flags, level)?;
                 }
