@@ -1507,6 +1507,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
         for (deferred_builtin, name, ty) in deferred_builtins {
             self.write_type(module, ty)?;
             write!(self.out, " {name} = ")?;
+            let temp_string;
             let call = match deferred_builtin {
                 crate::BuiltIn::Position { .. }
                 | crate::BuiltIn::ViewIndex
@@ -1541,7 +1542,10 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 crate::BuiltIn::GeometryIndex => "GeometryIndex()",
                 crate::BuiltIn::ObjectRayOrigin => "ObjectRayOrigin()",
                 crate::BuiltIn::ObjectRayDirection => "ObjectRayDirection()",
-                crate::BuiltIn::HitKind => &format!("{}(HitKind())", super::ray::MAP_HIT_NAME),
+                crate::BuiltIn::HitKind => {
+                    temp_string = format!("{}(HitKind())", super::ray::MAP_HIT_NAME);
+                    &temp_string
+                },
                 crate::BuiltIn::ObjectToWorld => "ObjectToWorld3x4()",
                 crate::BuiltIn::WorldToObject => "WorldToObject3x4()",
                 crate::BuiltIn::InstanceCustomData => "InstanceID()",
@@ -1551,7 +1555,8 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 crate::BuiltIn::RayFlags => "RayFlags()",
                 crate::BuiltIn::ClosestRayT => "RayTCurrent()",
                 crate::BuiltIn::FrontFacing => {
-                    &format!("{}(HitKind())", super::ray::MAP_FRONT_FACE_NAME)
+                    temp_string = format!("{}(HitKind())", super::ray::MAP_FRONT_FACE_NAME);
+                    &temp_string
                 }
                 crate::BuiltIn::PrimitiveIndex => "PrimitiveIndex()",
             };
