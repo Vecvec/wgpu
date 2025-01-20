@@ -8,35 +8,35 @@
     ray_gen:[
         (
             entry_point:"ray_gen",
-            target_profile:"raygeneration_5_1",
+            target_profile:"raygeneration_6_5",
         ),
     ],
     closest_hit:[
         (
             entry_point:"closest_hit",
-            target_profile:"closesthit_5_1",
+            target_profile:"closesthit_6_5",
         ),
     ],
     any_hit:[
         (
             entry_point:"discard_any_hit",
-            target_profile:"anyhit_5_1",
+            target_profile:"anyhit_6_5",
         ),
         (
             entry_point:"any_hit",
-            target_profile:"anyhit_5_1",
+            target_profile:"anyhit_6_5",
         ),
     ],
     miss:[
         (
             entry_point:"miss",
-            target_profile:"miss_5_1",
+            target_profile:"miss_6_5",
         ),
     ],
     intersection:[
         (
             entry_point:"intersect_return",
-            target_profile:"intersection_5_1",
+            target_profile:"intersection_6_5",
         ),
     ],
 )
