@@ -2716,7 +2716,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                             let intersection = self.expression(args.next()?, ctx)?;
                             args.finish()?;
 
-                            let intersection_ty = resolve_inner!(ctx, intersection).clone();
+                            let intersection_ty = ctx.register_type(intersection)?;
 
                             let result = ctx.interrupt_emitter(
                                 crate::Expression::RayQueryProceedResult,

@@ -1,7 +1,7 @@
 use super::validate_atomic_compare_exchange_struct;
 use crate::arena::{Arena, UniqueArena};
 use crate::arena::{Handle, HandleSet};
-use crate::{RayTracingFunction, Type};
+use crate::RayTracingFunction;
 
 use super::{
     analyzer::{UniformityDisruptor, UniformityRequirements},
