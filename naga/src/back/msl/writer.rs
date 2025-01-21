@@ -6147,7 +6147,7 @@ template <typename A>
                 "{level}{NAMESPACE}::threadgroup_barrier({NAMESPACE}::mem_flags::mem_none);",
             )?;
         }
-        if flags.contains(crate::Barrier::STORAGE) {
+        if flags.intersects(crate::Barrier::STORAGE | crate::Barrier::HANDLE) {
             writeln!(
                 self.out,
                 "{level}{NAMESPACE}::threadgroup_barrier({NAMESPACE}::mem_flags::mem_device);",

@@ -2494,6 +2494,14 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                                 .push(crate::Statement::Barrier(crate::Barrier::STORAGE), span);
                             return Ok(None);
                         }
+                        "textureBarrier" => {
+                            ctx.prepare_args(arguments, 0, span).finish()?;
+
+                            let rctx = ctx.runtime_expression_ctx(span)?;
+                            rctx.block
+                                .push(crate::Statement::Barrier(crate::Barrier::HANDLE), span);
+                            return Ok(None);
+                        }
                         "workgroupBarrier" => {
                             ctx.prepare_args(arguments, 0, span).finish()?;
 

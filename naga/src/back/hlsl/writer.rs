@@ -3736,7 +3736,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
     }
 
     fn write_barrier(&mut self, barrier: crate::Barrier, level: back::Level) -> BackendResult {
-        if barrier.contains(crate::Barrier::STORAGE) {
+        if barrier.intersects(crate::Barrier::STORAGE | crate::Barrier::HANDLE) {
             writeln!(self.out, "{level}DeviceMemoryBarrierWithGroupSync();")?;
         }
         if barrier.contains(crate::Barrier::WORK_GROUP) {

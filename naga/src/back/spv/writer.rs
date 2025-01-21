@@ -1276,7 +1276,7 @@ impl Writer {
     }
 
     pub(super) fn write_barrier(&mut self, flags: crate::Barrier, block: &mut Block) {
-        let memory_scope = if flags.contains(crate::Barrier::STORAGE) {
+        let memory_scope = if flags.intersects(crate::Barrier::STORAGE | crate::Barrier::HANDLE) {
             spirv::Scope::Device
         } else {
             spirv::Scope::Workgroup
@@ -1289,6 +1289,10 @@ impl Writer {
         semantics.set(
             spirv::MemorySemantics::WORKGROUP_MEMORY,
             flags.contains(crate::Barrier::WORK_GROUP),
+        );
+        semantics.set(
+            spirv::MemorySemantics::IMAGE_MEMORY,
+            flags.contains(crate::Barrier::HANDLE),
         );
         let exec_scope_id = if flags.contains(crate::Barrier::SUB_GROUP) {
             self.get_index_constant(spirv::Scope::Subgroup as u32)

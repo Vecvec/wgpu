@@ -1364,6 +1364,8 @@ bitflags::bitflags! {
         const WORK_GROUP = 1 << 1;
         /// Barrier synchronizes execution across all invocations within a subgroup that execute this instruction.
         const SUB_GROUP = 1 << 2;
+        /// Barrier affects all [`AddressSpace::Handle`] accesses.
+        const HANDLE = 1 << 3;
     }
 }
 
