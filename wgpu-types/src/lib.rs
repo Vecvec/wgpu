@@ -554,7 +554,6 @@ bitflags::bitflags! {
         ///
         /// By default only texture format properties as defined by the WebGPU specification are allowed.
         /// Enabling this feature flag extends the features of each format to the ones supported by the current device.
-        /// Note that without this flag, read/write storage access is not allowed at all.
         ///
         /// This extension does not enable additional formats.
         ///

@@ -14,6 +14,7 @@ static BINDING_ARRAY_STORAGE_TEXTURES: GpuTestConfiguration = GpuTestConfigurati
                 Features::TEXTURE_BINDING_ARRAY
                     | Features::STORAGE_RESOURCE_BINDING_ARRAY
                     | Features::UNIFORM_BUFFER_AND_STORAGE_TEXTURE_ARRAY_NON_UNIFORM_INDEXING
+                    // We need this because webGPU does not support rgba8unorm with read_write
                     | Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
             )
             .limits(Limits {
