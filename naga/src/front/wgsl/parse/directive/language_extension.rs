@@ -9,7 +9,6 @@ use strum::VariantArray;
 /// WGSL spec.: <https://www.w3.org/TR/WGSL/#language-extensions-sec>
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum LanguageExtension {
-    #[allow(unused)]
     Implemented(ImplementedLanguageExtension),
     Unimplemented(UnimplementedLanguageExtension),
 }
@@ -24,9 +23,9 @@ impl LanguageExtension {
     /// Convert from a sentinel word in WGSL into its associated [`LanguageExtension`], if possible.
     pub fn from_ident(s: &str) -> Option<Self> {
         Some(match s {
-            Self::READONLY_AND_READWRITE_STORAGE_TEXTURES => Self::Unimplemented(
-                UnimplementedLanguageExtension::ReadOnlyAndReadWriteStorageTextures,
-            ),
+            Self::READONLY_AND_READWRITE_STORAGE_TEXTURES => {
+                Self::Implemented(ImplementedLanguageExtension::ReadOnlyAndReadWriteStorageTextures)
+            }
             Self::PACKED4X8_INTEGER_DOT_PRODUCT => {
                 Self::Unimplemented(UnimplementedLanguageExtension::Packed4x8IntegerDotProduct)
             }
@@ -45,9 +44,6 @@ impl LanguageExtension {
         match self {
             Self::Implemented(kind) => kind.to_ident(),
             Self::Unimplemented(kind) => match kind {
-                UnimplementedLanguageExtension::ReadOnlyAndReadWriteStorageTextures => {
-                    Self::READONLY_AND_READWRITE_STORAGE_TEXTURES
-                }
                 UnimplementedLanguageExtension::Packed4x8IntegerDotProduct => {
                     Self::PACKED4X8_INTEGER_DOT_PRODUCT
                 }
@@ -64,7 +60,9 @@ impl LanguageExtension {
 
 /// A variant of [`LanguageExtension::Implemented`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
-pub enum ImplementedLanguageExtension {}
+pub enum ImplementedLanguageExtension {
+    ReadOnlyAndReadWriteStorageTextures,
+}
 
 impl ImplementedLanguageExtension {
     /// Returns slice of all variants of [`ImplementedLanguageExtension`].
@@ -74,14 +72,17 @@ impl ImplementedLanguageExtension {
 
     /// Maps this [`ImplementedLanguageExtension`] into the sentinel word associated with it in WGSL.
     pub const fn to_ident(self) -> &'static str {
-        match self {}
+        match self {
+            ImplementedLanguageExtension::ReadOnlyAndReadWriteStorageTextures => {
+                LanguageExtension::READONLY_AND_READWRITE_STORAGE_TEXTURES
+            }
+        }
     }
 }
 
 /// A variant of [`LanguageExtension::Unimplemented`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum UnimplementedLanguageExtension {
-    ReadOnlyAndReadWriteStorageTextures,
     Packed4x8IntegerDotProduct,
     UnrestrictedPointerParameters,
     PointerCompositeAccess,
@@ -90,7 +91,6 @@ pub enum UnimplementedLanguageExtension {
 impl UnimplementedLanguageExtension {
     pub(crate) const fn tracking_issue_num(self) -> u16 {
         match self {
-            Self::ReadOnlyAndReadWriteStorageTextures => 6204,
             Self::Packed4x8IntegerDotProduct => 6445,
             Self::UnrestrictedPointerParameters => 5158,
             Self::PointerCompositeAccess => 6192,

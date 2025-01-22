@@ -859,8 +859,7 @@ impl dispatch::InstanceInterface for ContextWgpuCore {
             .copied()
             .fold(
                 crate::WgslLanguageFeatures::empty(),
-                #[expect(unreachable_code)]
-                |acc, wle| acc | match wle {},
+                |acc, wle| acc | match wle { wgc::naga::front::wgsl::ImplementedLanguageExtension::ReadOnlyAndReadWriteStorageTextures => crate::WgslLanguageFeatures::ReadOnlyAndReadWriteStorageTextures },
             )
     }
 }
