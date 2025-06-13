@@ -784,6 +784,10 @@ fn write_output_hlsl(
             naga::ShaderStage::Vertex => &mut config.vertex,
             naga::ShaderStage::Fragment => &mut config.fragment,
             naga::ShaderStage::Compute => &mut config.compute,
+            naga::ShaderStage::RayGeneration => &mut config.ray_generation,
+            naga::ShaderStage::RayClosestHit => &mut config.ray_closest_hit,
+            naga::ShaderStage::RayAnyHit => &mut config.ray_any_hit,
+            naga::ShaderStage::RayMiss => &mut config.ray_miss,
             naga::ShaderStage::Task | naga::ShaderStage::Mesh => unreachable!(),
         }
         .push(hlsl_snapshots::ConfigItem {

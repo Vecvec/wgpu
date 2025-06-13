@@ -123,6 +123,8 @@ pub enum EntryPointError {
     InvalidIntegerInterpolation { location: u32 },
     #[error(transparent)]
     Function(#[from] FunctionError),
+    #[error("Capability `RAY_TRACING_PIPELINE` is required for shader stage {0:?}")]
+    MissingRayTracingPipelineCapability(crate::ShaderStage),
 }
 
 fn storage_usage(access: crate::StorageAccess) -> GlobalUse {
@@ -238,7 +240,11 @@ impl VaryingContext<'_> {
                         match self.stage {
                             St::Vertex => self.output,
                             St::Fragment => !self.output,
-                            St::Compute => false,
+                            St::Compute
+                            | St::RayGeneration
+                            | St::RayClosestHit
+                            | St::RayAnyHit
+                            | St::RayMiss => false,
                             St::Task | St::Mesh => unreachable!(),
                         },
                         *ty_inner
@@ -250,7 +256,11 @@ impl VaryingContext<'_> {
                     Bi::ViewIndex => (
                         match self.stage {
                             St::Vertex | St::Fragment => !self.output,
-                            St::Compute => false,
+                            St::Compute
+                            | St::RayGeneration
+                            | St::RayClosestHit
+                            | St::RayAnyHit
+                            | St::RayMiss => false,
                             St::Task | St::Mesh => unreachable!(),
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::I32),
@@ -298,7 +308,11 @@ impl VaryingContext<'_> {
                     Bi::SubgroupSize | Bi::SubgroupInvocationId => (
                         match self.stage {
                             St::Compute | St::Fragment => !self.output,
-                            St::Vertex => false,
+                            St::Vertex
+                            | St::RayGeneration
+                            | St::RayClosestHit
+                            | St::RayAnyHit
+                            | St::RayMiss => false,
                             St::Task | St::Mesh => unreachable!(),
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
@@ -393,7 +407,11 @@ impl VaryingContext<'_> {
                 let needs_interpolation = match self.stage {
                     crate::ShaderStage::Vertex => self.output,
                     crate::ShaderStage::Fragment => !self.output,
-                    crate::ShaderStage::Compute => false,
+                    crate::ShaderStage::Compute
+                    | crate::ShaderStage::RayGeneration
+                    | crate::ShaderStage::RayClosestHit
+                    | crate::ShaderStage::RayAnyHit
+                    | crate::ShaderStage::RayMiss => false,
                     crate::ShaderStage::Task | crate::ShaderStage::Mesh => unreachable!(),
                 };
 
@@ -683,6 +701,21 @@ impl super::Validator {
             return Err(EntryPointError::UnexpectedWorkgroupSize.with_span());
         }
 
+        if let crate::ShaderStage::RayGeneration
+        | crate::ShaderStage::RayClosestHit
+        | crate::ShaderStage::RayAnyHit
+        | crate::ShaderStage::RayMiss = ep.stage
+        {
+            if !self
+                .capabilities
+                .contains(Capabilities::RAY_TRACING_PIPELINE)
+            {
+                return Err(
+                    EntryPointError::MissingRayTracingPipelineCapability(ep.stage).with_span(),
+                );
+            }
+        }
+
         let mut info = self
             .validate_function(&ep.function, module, mod_info, true)
             .map_err(WithSpan::into_other)?;
@@ -694,6 +727,10 @@ impl super::Validator {
                 crate::ShaderStage::Vertex => ShaderStages::VERTEX,
                 crate::ShaderStage::Fragment => ShaderStages::FRAGMENT,
                 crate::ShaderStage::Compute => ShaderStages::COMPUTE,
+                crate::ShaderStage::RayGeneration => ShaderStages::RAY_GENERATION,
+                crate::ShaderStage::RayClosestHit => ShaderStages::RAY_CLOSEST_HIT,
+                crate::ShaderStage::RayAnyHit => ShaderStages::RAY_ANY_HIT,
+                crate::ShaderStage::RayMiss => ShaderStages::RAY_MISS,
                 crate::ShaderStage::Task | crate::ShaderStage::Mesh => unreachable!(),
             };
 

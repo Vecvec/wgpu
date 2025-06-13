@@ -1235,7 +1235,11 @@ impl Interface {
                                             iv.ty.dim.num_components(),
                                         )
                                     }
-                                    naga::ShaderStage::Compute => (false, 0),
+                                    naga::ShaderStage::Compute
+                                    | naga::ShaderStage::RayGeneration
+                                    | naga::ShaderStage::RayClosestHit
+                                    | naga::ShaderStage::RayAnyHit
+                                    | naga::ShaderStage::RayMiss => (false, 0),
                                     naga::ShaderStage::Task | naga::ShaderStage::Mesh => {
                                         unreachable!()
                                     }

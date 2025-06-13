@@ -21,4 +21,12 @@
             target_profile:"cs_5_1",
         ),
     ],
+    ray_generation:[
+    ],
+    ray_closest_hit:[
+    ],
+    ray_any_hit:[
+    ],
+    ray_miss:[
+    ],
 )

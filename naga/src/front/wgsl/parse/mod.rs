@@ -2862,6 +2862,18 @@ impl Parser {
                     }
                     workgroup_size.set(new_workgroup_size, name_span)?;
                 }
+                "ray_generation" => {
+                    stage.set(ShaderStage::RayGeneration, name_span)?;
+                }
+                "ray_closest_hit" => {
+                    stage.set(ShaderStage::RayClosestHit, name_span)?;
+                }
+                "ray_any_hit" => {
+                    stage.set(ShaderStage::RayAnyHit, name_span)?;
+                }
+                "ray_miss" => {
+                    stage.set(ShaderStage::RayMiss, name_span)?;
+                }
                 "early_depth_test" => {
                     lexer.expect(Token::Paren('('))?;
                     let (ident, ident_span) = lexer.next_ident_with_span()?;

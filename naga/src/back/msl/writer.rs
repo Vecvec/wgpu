@@ -6168,7 +6168,12 @@ template <typename A>
                     LocationMode::Uniform,
                     false,
                 ),
-                crate::ShaderStage::Task | crate::ShaderStage::Mesh => unreachable!(),
+                crate::ShaderStage::Task
+                | crate::ShaderStage::Mesh
+                | crate::ShaderStage::RayGeneration
+                | crate::ShaderStage::RayClosestHit
+                | crate::ShaderStage::RayAnyHit
+                | crate::ShaderStage::RayMiss => unreachable!(),
             };
 
             // Should this entry point be modified to do vertex pulling?

@@ -327,6 +327,10 @@ pub enum ShaderStage {
     Compute,
     Task,
     Mesh,
+    RayGeneration,
+    RayClosestHit,
+    RayAnyHit,
+    RayMiss,
 }
 
 /// Addressing space of variables.

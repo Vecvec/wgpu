@@ -1180,7 +1180,18 @@ impl Writer {
                 spirv::ExecutionModel::GLCompute
             }
             crate::ShaderStage::Task | crate::ShaderStage::Mesh => unreachable!(),
+            crate::ShaderStage::RayGeneration => spirv::ExecutionModel::RayGenerationKHR,
+            crate::ShaderStage::RayClosestHit => spirv::ExecutionModel::ClosestHitKHR,
+            crate::ShaderStage::RayAnyHit => spirv::ExecutionModel::AnyHitKHR,
+            crate::ShaderStage::RayMiss => spirv::ExecutionModel::MissKHR,
         };
+        if let crate::ShaderStage::RayGeneration
+        | crate::ShaderStage::RayClosestHit
+        | crate::ShaderStage::RayAnyHit
+        | crate::ShaderStage::RayMiss = entry_point.stage
+        {
+            self.require_any("Ray tracing pipeline", &[spirv::Capability::RayTracingKHR])?
+        }
         //self.check(exec_model.required_capabilities())?;
 
         Ok(Instruction::entry_point(
@@ -2389,6 +2400,18 @@ impl Writer {
             }
         }
 
+        let mut has_ray_tracing_pipeline = false;
+
+        for entry_point in ir_module.entry_points.iter() {
+            if let crate::ShaderStage::RayGeneration
+            | crate::ShaderStage::RayClosestHit
+            | crate::ShaderStage::RayAnyHit
+            | crate::ShaderStage::RayMiss = entry_point.stage
+            {
+                has_ray_tracing_pipeline = true;
+            }
+        }
+
         if self.physical_layout.version < 0x10300 && has_storage_buffers {
             // enable the storage buffer class on < SPV-1.3
             Instruction::extension("SPV_KHR_storage_buffer_storage_class")
@@ -2404,6 +2427,10 @@ impl Writer {
         }
         if has_vertex_return {
             Instruction::extension("SPV_KHR_ray_tracing_position_fetch")
+                .to_words(&mut self.logical_layout.extensions);
+        }
+        if has_ray_tracing_pipeline {
+            Instruction::extension("SPV_KHR_ray_tracing")
                 .to_words(&mut self.logical_layout.extensions);
         }
         Instruction::type_void(self.void_type).to_words(&mut self.logical_layout.declarations);

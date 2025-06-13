@@ -1,0 +1,18 @@
+; SPIR-V
+; Version: 1.4
+; Generator: rspirv
+; Bound: 7
+OpCapability Shader
+OpCapability RayTracingKHR
+OpExtension "SPV_KHR_ray_tracing"
+%1 = OpExtInstImport "GLSL.std.450"
+OpMemoryModel Logical GLSL450
+OpEntryPoint RayGenerationNV %4 "ray_gen"
+%2 = OpTypeVoid
+%5 = OpTypeFunction %2
+%4 = OpFunction  %2  None %5
+%3 = OpLabel
+OpBranch %6
+%6 = OpLabel
+OpReturn
+OpFunctionEnd

@@ -219,6 +219,8 @@ impl crate::ShaderStage {
             Self::Fragment => "ps",
             Self::Compute => "cs",
             Self::Task | Self::Mesh => unreachable!(),
+            // All ray tracing shaders are part of a library, so we need to use lib
+            Self::RayGeneration | Self::RayClosestHit | Self::RayAnyHit | Self::RayMiss => "lib",
         }
     }
 }

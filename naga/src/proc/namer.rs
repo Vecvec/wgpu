@@ -218,6 +218,10 @@ impl Namer {
                         crate::ShaderStage::Fragment => "FragmentOutput",
                         crate::ShaderStage::Compute => "ComputeOutput",
                         crate::ShaderStage::Task | crate::ShaderStage::Mesh => unreachable!(),
+                        crate::ShaderStage::RayGeneration => "RayGenerationOutput",
+                        crate::ShaderStage::RayClosestHit => "RayClosestHitOutput",
+                        crate::ShaderStage::RayAnyHit => "RayAnyHitOutput",
+                        crate::ShaderStage::RayMiss => "RayMissOutput",
                     };
                     entrypoint_type_fallbacks.insert(result.ty, label);
                 }

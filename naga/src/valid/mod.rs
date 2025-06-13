@@ -165,6 +165,8 @@ bitflags::bitflags! {
         const RAY_HIT_VERTEX_POSITION = 1 << 25;
         /// Support for 16-bit floating-point types.
         const SHADER_FLOAT16 = 1 << 26;
+        /// Support for shader stages specifically designed for ray tracing
+        const RAY_TRACING_PIPELINE = 1 << 27;
     }
 }
 
@@ -235,6 +237,10 @@ bitflags::bitflags! {
         const VERTEX = 0x1;
         const FRAGMENT = 0x2;
         const COMPUTE = 0x4;
+        const RAY_GENERATION = 0x8;
+        const RAY_CLOSEST_HIT = 0x10;
+        const RAY_ANY_HIT = 0x20;
+        const RAY_MISS = 0x40;
     }
 }
 

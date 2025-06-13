@@ -1336,6 +1336,14 @@ bitflags::bitflags! {
         const TASK = 1 << 3;
         /// Binding is visible from the mesh shader of a mesh pipeline
         const MESH = 1 << 4;
+        /// Binding is visible from the ray generation shader of a ray tracing pipeline
+        const RAY_GENERATION = 1 << 5;
+        /// Binding is visible from the closest hit shader of a ray tracing pipeline
+        const RAY_CLOSEST_HIT = 1 << 6;
+        /// Binding is visible from the any hit shader of a ray tracing pipeline
+        const RAY_ANY_HIT = 1 << 7;
+        /// Binding is visible from the miss shader of a ray tracing pipeline
+        const RAY_MISS = 1 << 8;
     }
 }
 

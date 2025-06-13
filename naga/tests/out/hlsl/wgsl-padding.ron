@@ -9,4 +9,12 @@
     ],
     compute:[
     ],
+    ray_generation:[
+    ],
+    ray_closest_hit:[
+    ],
+    ray_any_hit:[
+    ],
+    ray_miss:[
+    ],
 )
