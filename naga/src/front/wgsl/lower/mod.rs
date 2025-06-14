@@ -1520,6 +1520,27 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
             };
 
             let (workgroup_size, workgroup_size_overrides) = workgroup_size_info;
+
+            let mut payload_type_handle = None;
+
+            if let Some(payload_ty) = entry.payload_type {
+                let lowered_ty = self.resolve_ast_type(payload_ty, &mut ctx.as_const())?;
+                payload_type_handle = Some(lowered_ty);
+            }
+
+            let mut incoming_payload_handle = None;
+
+            if let Some(incoming_payload) = entry.incoming_payload {
+                let lowered_global = ctx
+                    .globals
+                    .get(incoming_payload)
+                    .ok_or(Error::UnknownIdent(span, incoming_payload))?;
+                let LoweredGlobalDecl::Var(global_payload_handle) = lowered_global else {
+                    return Err(Box::new(Error::Unexpected(span, ExpectedToken::Variable)));
+                };
+                incoming_payload_handle = Some(*global_payload_handle)
+            }
+
             ctx.module.entry_points.push(ir::EntryPoint {
                 name: f.name.name.to_string(),
                 stage: entry.stage,
@@ -1527,6 +1548,8 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 workgroup_size,
                 workgroup_size_overrides,
                 function,
+                payload_type_handle,
+                incoming_payload_handle,
             });
             Ok(LoweredGlobalDecl::EntryPoint(
                 ctx.module.entry_points.len() - 1,

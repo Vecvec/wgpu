@@ -390,7 +390,18 @@ impl super::Validator {
                 }
                 ShaderStages::all()
             }
-            E::GlobalVariable(_handle) => ShaderStages::all(),
+            E::GlobalVariable(handle) => {
+                if let crate::AddressSpace::RayPayload | crate::AddressSpace::IncomingRayPayload =
+                    module.global_variables[handle].space
+                {
+                    ShaderStages::RAY_GENERATION
+                        | ShaderStages::RAY_CLOSEST_HIT
+                        | ShaderStages::RAY_ANY_HIT
+                        | ShaderStages::RAY_MISS
+                } else {
+                    ShaderStages::all()
+                }
+            }
             E::LocalVariable(_handle) => ShaderStages::all(),
             E::Load { pointer } => {
                 match resolver[pointer] {

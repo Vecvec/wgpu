@@ -128,6 +128,8 @@ pub struct EntryPoint<'a> {
     pub stage: crate::ShaderStage,
     pub early_depth_test: Option<crate::EarlyDepthTest>,
     pub workgroup_size: Option<[Option<Handle<Expression<'a>>>; 3]>,
+    pub payload_type: Option<Handle<Type<'a>>>,
+    pub incoming_payload: Option<&'a str>,
 }
 
 #[cfg(doc)]

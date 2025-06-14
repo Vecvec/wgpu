@@ -352,6 +352,8 @@ pub const fn address_space_str(
             As::WorkGroup => "workgroup",
             As::Handle => return (None, None),
             As::Function => "function",
+            As::RayPayload => "ray_payload",
+            As::IncomingRayPayload => "incoming_ray_payload",
         }),
         None,
     )

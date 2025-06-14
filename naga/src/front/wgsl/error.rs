@@ -361,6 +361,7 @@ pub(crate) enum Error<'a> {
     ExpectedNonNegative(Span),
     ExpectedPositiveArrayLength(Span),
     MissingWorkgroupSize(Span),
+    MissingIncomingPayload(Span),
     ConstantEvaluatorError(Box<ConstantEvaluatorError>, Span),
     AutoConversion(Box<AutoConversionError>),
     AutoConversionLeafScalar(Box<AutoConversionLeafScalarError>),
@@ -1065,6 +1066,14 @@ impl<'a> Error<'a> {
                 labels: vec![(
                     span,
                     "must be paired with a `@workgroup_size` attribute".into(),
+                )],
+                notes: vec![],
+            },
+            Error::MissingIncomingPayload(span) => ParseError {
+                message: "incoming payload is missing on a ray tracing pipeline entry point".to_string(),
+                labels: vec![(
+                    span,
+                    "must be paired with a `@incoming_payload` attribute".into(),
                 )],
                 notes: vec![],
             },

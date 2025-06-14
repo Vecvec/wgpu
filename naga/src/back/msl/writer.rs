@@ -579,6 +579,7 @@ impl crate::AddressSpace {
             | Self::PushConstant
             | Self::Handle => true,
             Self::Function => false,
+            Self::RayPayload | Self::IncomingRayPayload => todo!(),
         }
     }
 
@@ -596,6 +597,8 @@ impl crate::AddressSpace {
             Self::Uniform | Self::PushConstant => false,
             // Not applicable.
             Self::Handle | Self::Function => false,
+            // Unimplemented, ray tracing pipelines not yet implemented
+            Self::RayPayload | Self::IncomingRayPayload => false,
         }
     }
 
@@ -606,6 +609,8 @@ impl crate::AddressSpace {
             Self::Storage { .. } => Some("device"),
             Self::Private | Self::Function => Some("thread"),
             Self::WorkGroup => Some("threadgroup"),
+            // Unimplemented
+            Self::RayPayload | Self::IncomingRayPayload => None,
         }
     }
 }
@@ -6239,6 +6244,12 @@ template <typename A>
                         crate::AddressSpace::Function
                         | crate::AddressSpace::Private
                         | crate::AddressSpace::WorkGroup => {}
+                        crate::AddressSpace::RayPayload
+                        | crate::AddressSpace::IncomingRayPayload => {
+                            return Err(Error::FeatureNotImplemented(
+                                "Ray tracing pipelines".to_string(),
+                            ))
+                        }
                     }
                 }
                 if needs_buffer_sizes {

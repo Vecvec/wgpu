@@ -114,6 +114,8 @@
                 ],
                 diagnostic_filter_leaf: None,
             ),
+            payload_type_handle: None,
+            incoming_payload_handle: None,
         ),
     ],
     diagnostic_filters: [],

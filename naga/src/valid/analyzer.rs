@@ -641,6 +641,8 @@ impl FunctionInfo {
                     // storage data is only uniform when read-only
                     As::Storage { access } => !access.contains(crate::StorageAccess::STORE),
                     As::Handle => false,
+                    // Local to an invocation, so not guaranteed to be uniform
+                    As::RayPayload | As::IncomingRayPayload => false,
                 };
                 Uniformity {
                     non_uniform_result: if uniform { None } else { Some(handle) },

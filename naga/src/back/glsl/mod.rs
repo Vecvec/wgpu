@@ -139,7 +139,9 @@ impl crate::AddressSpace {
             | crate::AddressSpace::Uniform
             | crate::AddressSpace::Storage { .. }
             | crate::AddressSpace::Handle
-            | crate::AddressSpace::PushConstant => false,
+            | crate::AddressSpace::PushConstant
+            | crate::AddressSpace::RayPayload
+            | crate::AddressSpace::IncomingRayPayload => false,
         }
     }
 }
@@ -580,6 +582,8 @@ pub enum Error {
     FirstSamplingNotSupported,
     #[error(transparent)]
     ResolveArraySizeError(#[from] proc::ResolveArraySizeError),
+    #[error("Ray tracing address spaces are unsupported")]
+    RayTracingAddressSpaceUnsupported,
 }
 
 /// Binary operation with a different logic on the GLSL side.
@@ -1317,6 +1321,9 @@ impl<'a, W: Write> Writer<'a, W> {
             crate::AddressSpace::Function => unreachable!(),
             // Textures and samplers are handled directly in `Writer::write`.
             crate::AddressSpace::Handle => unreachable!(),
+            crate::AddressSpace::RayPayload | crate::AddressSpace::IncomingRayPayload => {
+                return Err(Error::RayTracingAddressSpaceUnsupported)
+            }
         }
 
         Ok(())
@@ -5275,6 +5282,7 @@ const fn glsl_storage_qualifier(space: crate::AddressSpace) -> Option<&'static s
         As::Handle => Some("uniform"),
         As::WorkGroup => Some("shared"),
         As::PushConstant => Some("uniform"),
+        As::RayPayload | As::IncomingRayPayload => None,
     }
 }
 

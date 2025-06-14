@@ -71,6 +71,8 @@
                 ],
                 diagnostic_filter_leaf: Some(0),
             ),
+            payload_type_handle: None,
+            incoming_payload_handle: None,
         ),
     ],
     diagnostic_filters: [

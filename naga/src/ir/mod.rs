@@ -353,6 +353,10 @@ pub enum AddressSpace {
     Handle,
     /// Push constants.
     PushConstant,
+    /// Ray tracing payload, for beginning a new ray trace, mutable.
+    RayPayload,
+    /// Ray tracing payload, received from a trace ray call, mutable.
+    IncomingRayPayload,
 }
 
 /// Built-in inputs and outputs.
@@ -2290,6 +2294,10 @@ pub struct EntryPoint {
     pub workgroup_size_overrides: Option<[Option<Handle<Expression>>; 3]>,
     /// The entrance function.
     pub function: Function,
+    /// The payload going into subsequent calls
+    pub payload_type_handle: Option<Handle<Type>>,
+    /// The payload coming in from previous calls, may be the same as `payload_handle`
+    pub incoming_payload_handle: Option<Handle<GlobalVariable>>,
 }
 
 /// Return types predeclared for the frexp, modf, and atomicCompareExchangeWeak built-in functions.

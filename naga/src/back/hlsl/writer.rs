@@ -968,6 +968,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 write!(self.out, "ConstantBuffer<")?;
                 "b"
             }
+            crate::AddressSpace::RayPayload | crate::AddressSpace::IncomingRayPayload => {
+                return Err(Error::Unimplemented("Ray tracing pipeline".to_string()))
+            }
         };
 
         // If the global is a push constant write the type now because it will be a
@@ -3002,7 +3005,9 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                                 crate::AddressSpace::Function
                                 | crate::AddressSpace::Private
                                 | crate::AddressSpace::WorkGroup
-                                | crate::AddressSpace::PushConstant,
+                                | crate::AddressSpace::PushConstant
+                                | crate::AddressSpace::RayPayload
+                                | crate::AddressSpace::IncomingRayPayload,
                             )
                             | None => true,
                             Some(crate::AddressSpace::Uniform) => {

@@ -2779,11 +2779,14 @@ impl Parser {
         let mut binding = None;
         let mut stage = ParsedAttribute::default();
         let mut compute_span = Span::new(0, 0);
+        let mut ray_attribute_span = Span::new(0, 0);
         let mut workgroup_size = ParsedAttribute::default();
         let mut early_depth_test = ParsedAttribute::default();
         let (mut bind_index, mut bind_group) =
             (ParsedAttribute::default(), ParsedAttribute::default());
         let mut id = ParsedAttribute::default();
+        let mut payload_type = ParsedAttribute::default();
+        let mut incoming_payload = ParsedAttribute::default();
 
         let mut must_use: ParsedAttribute<Span> = ParsedAttribute::default();
 
@@ -2864,15 +2867,36 @@ impl Parser {
                 }
                 "ray_generation" => {
                     stage.set(ShaderStage::RayGeneration, name_span)?;
+                    ray_attribute_span = name_span;
                 }
                 "ray_closest_hit" => {
                     stage.set(ShaderStage::RayClosestHit, name_span)?;
+                    ray_attribute_span = name_span;
                 }
                 "ray_any_hit" => {
                     stage.set(ShaderStage::RayAnyHit, name_span)?;
+                    ray_attribute_span = name_span;
                 }
                 "ray_miss" => {
                     stage.set(ShaderStage::RayMiss, name_span)?;
+                    ray_attribute_span = name_span;
+                }
+                "payload_type" => {
+                    lexer.expect(Token::Paren('('))?;
+                    let ty = self.type_decl(lexer, &mut ctx)?;
+                    lexer.expect(Token::Paren(')'))?;
+                    payload_type.set(ty, name_span)?;
+                }
+                "incoming_payload" => {
+                    lexer.expect(Token::Paren('('))?;
+                    let ident = lexer.next_ident()?;
+                    lexer.expect(Token::Paren(')'))?;
+                    let ast::IdentExpr::Unresolved(ident) =
+                        self.ident_expr(ident.name, ident.span, &mut ctx)
+                    else {
+                        unreachable!("We should have no local expressions here")
+                    };
+                    incoming_payload.set(ident, name_span)?;
                 }
                 "early_depth_test" => {
                     lexer.expect(Token::Paren('('))?;
@@ -3023,10 +3047,22 @@ impl Parser {
                         if stage == ShaderStage::Compute && workgroup_size.value.is_none() {
                             return Err(Box::new(Error::MissingWorkgroupSize(compute_span)));
                         }
+                        if let ShaderStage::RayClosestHit
+                        | ShaderStage::RayAnyHit
+                        | ShaderStage::RayMiss = stage
+                        {
+                            if incoming_payload.value.is_none() {
+                                return Err(Box::new(Error::MissingIncomingPayload(
+                                    ray_attribute_span,
+                                )));
+                            }
+                        }
                         Some(ast::EntryPoint {
                             stage,
                             early_depth_test: early_depth_test.value,
                             workgroup_size: workgroup_size.value,
+                            payload_type: payload_type.value,
+                            incoming_payload: incoming_payload.value,
                         })
                     } else {
                         None

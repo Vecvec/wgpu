@@ -1381,6 +1381,8 @@ impl Frontend {
                 result: ty.map(|ty| FunctionResult { ty, binding: None }),
                 ..Default::default()
             },
+            payload_type_handle: None,
+            incoming_payload_handle: None,
         });
 
         Ok(())

@@ -125,6 +125,24 @@ pub enum EntryPointError {
     Function(#[from] FunctionError),
     #[error("Capability `RAY_TRACING_PIPELINE` is required for shader stage {0:?}")]
     MissingRayTracingPipelineCapability(crate::ShaderStage),
+    #[error("A different payload ({0:?}) is used than the one defined in the attribute ({1:?})")]
+    IncorrectPayload(Handle<crate::GlobalVariable>, Handle<crate::GlobalVariable>),
+    #[error("A different incoming payload ({0:?}) is used than the one defined in the attribute ({1:?})")]
+    IncorrectIncomingPayload(Handle<crate::GlobalVariable>, Handle<crate::GlobalVariable>),
+    #[error("An incoming payload ({0:?}) is used but was not defined in the attribute (use `@incoming_payload`)")]
+    MissingIncomingPayloadAttribute(Handle<crate::GlobalVariable>),
+    #[error("The payload attribute did not refer to variable {0:?} with address space `ray_payload`, or to the incoming payload for this entry point, instead it had {1:?}")]
+    InvalidPayloadAttribute(Handle<crate::GlobalVariable>, crate::AddressSpace),
+    #[error("The incoming payload attribute did not refer to variable {0:?} with address space `incoming_ray_payload`, instead it had {1:?}")]
+    InvalidIncomingPayloadAttribute(Handle<crate::GlobalVariable>, crate::AddressSpace),
+    #[error("The payload type attribute was not allowed at stage {0:?} but was set")]
+    DisallowedPayloadTypeAttribute(crate::ShaderStage),
+    #[error("The incoming payload attribute was not allowed at stage {0:?} but was set")]
+    DisallowedIncomingPayloadAttribute(crate::ShaderStage),
+    #[error("The incoming payload attribute was required at stage {0:?} but was not set")]
+    RequiredIncomingPayloadAttribute(crate::ShaderStage),
+    #[error("The incoming payload attribute had type {0:?} but is required to match the type of the payload type attribute {1:?}")]
+    MismatchedPayloadAttributes(Handle<crate::Type>, Handle<crate::Type>),
 }
 
 fn storage_usage(access: crate::StorageAccess) -> GlobalUse {
@@ -631,6 +649,17 @@ impl super::Validator {
                     false,
                 )
             }
+            crate::AddressSpace::RayPayload | crate::AddressSpace::IncomingRayPayload => {
+                if !self
+                    .capabilities
+                    .contains(Capabilities::RAY_TRACING_PIPELINE)
+                {
+                    return Err(GlobalVariableError::UnsupportedCapability(
+                        Capabilities::RAY_TRACING_PIPELINE,
+                    ));
+                }
+                (TypeFlags::DATA | TypeFlags::COPY | TypeFlags::SIZED, false)
+            }
         };
 
         if !type_info.flags.contains(required_type_flags) {
@@ -801,11 +830,84 @@ impl super::Validator {
             }
         }
 
+        match ep.stage {
+            crate::ShaderStage::Vertex
+            | crate::ShaderStage::Fragment
+            | crate::ShaderStage::Compute => {
+                if ep.payload_type_handle.is_some() {
+                    return Err(EntryPointError::DisallowedPayloadTypeAttribute(ep.stage).with_span());
+                }
+                if ep.incoming_payload_handle.is_some() {
+                    return Err(
+                        EntryPointError::DisallowedIncomingPayloadAttribute(ep.stage).with_span(),
+                    );
+                }
+            }
+            crate::ShaderStage::RayGeneration => {
+                if ep.incoming_payload_handle.is_some() {
+                    return Err(
+                        EntryPointError::DisallowedIncomingPayloadAttribute(ep.stage).with_span(),
+                    );
+                }
+            }
+            crate::ShaderStage::RayClosestHit | crate::ShaderStage::RayMiss => {
+                match ep.incoming_payload_handle {
+                    None => {
+                        return Err(
+                            EntryPointError::RequiredIncomingPayloadAttribute(ep.stage).with_span()
+                        );
+                    }
+                    Some(handle) => {
+                        if let Some(payload_ty) = ep.payload_type_handle {
+                            if module.global_variables[handle].ty != payload_ty {
+                                return Err(EntryPointError::MismatchedPayloadAttributes(module.global_variables[handle].ty, payload_ty).with_span())
+                            }
+                        }
+                    }
+                }
+            }
+            crate::ShaderStage::RayAnyHit => {
+                if ep.payload_type_handle.is_some() {
+                    return Err(EntryPointError::DisallowedPayloadTypeAttribute(ep.stage).with_span());
+                }
+            }
+            crate::ShaderStage::Mesh | crate::ShaderStage::Task => unreachable!(),
+        }
+
+        if let Some(incoming_payload) = ep.incoming_payload_handle {
+            if module.global_variables[incoming_payload].space
+                != crate::AddressSpace::IncomingRayPayload
+            {
+                return Err(EntryPointError::InvalidIncomingPayloadAttribute(
+                    incoming_payload,
+                    module.global_variables[incoming_payload].space,
+                )
+                .with_span());
+            }
+        }
+
         self.ep_resource_bindings.clear();
         for (var_handle, var) in module.global_variables.iter() {
             let usage = info[var_handle];
             if usage.is_empty() {
                 continue;
+            }
+
+            if let crate::AddressSpace::IncomingRayPayload = var.space {
+                match ep.incoming_payload_handle {
+                    None => {
+                        return Err(EntryPointError::MissingIncomingPayloadAttribute(var_handle)
+                            .with_span());
+                    }
+                    Some(handle) => {
+                        if handle != var_handle {
+                            return Err(EntryPointError::IncorrectIncomingPayload(
+                                var_handle, handle,
+                            )
+                            .with_span());
+                        }
+                    }
+                }
             }
 
             let allowed_usage = match var.space {
@@ -826,7 +928,10 @@ impl super::Validator {
                     } => storage_usage(access),
                     _ => GlobalUse::READ | GlobalUse::QUERY,
                 },
-                crate::AddressSpace::Private | crate::AddressSpace::WorkGroup => {
+                crate::AddressSpace::Private
+                | crate::AddressSpace::WorkGroup
+                | crate::AddressSpace::RayPayload
+                | crate::AddressSpace::IncomingRayPayload => {
                     GlobalUse::READ | GlobalUse::WRITE | GlobalUse::QUERY
                 }
                 crate::AddressSpace::PushConstant => GlobalUse::READ,

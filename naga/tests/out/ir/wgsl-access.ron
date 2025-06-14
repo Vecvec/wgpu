@@ -2653,6 +2653,8 @@
                 ],
                 diagnostic_filter_leaf: None,
             ),
+            payload_type_handle: None,
+            incoming_payload_handle: None,
         ),
         (
             name: "foo_frag",
@@ -2846,6 +2848,8 @@
                 ],
                 diagnostic_filter_leaf: None,
             ),
+            payload_type_handle: None,
+            incoming_payload_handle: None,
         ),
         (
             name: "foo_compute",
@@ -2905,6 +2909,8 @@
                 ],
                 diagnostic_filter_leaf: None,
             ),
+            payload_type_handle: None,
+            incoming_payload_handle: None,
         ),
     ],
     diagnostic_filters: [],

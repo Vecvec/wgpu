@@ -588,6 +588,8 @@ impl<I: Iterator<Item = u32>> super::Frontend<I> {
             workgroup_size: ep.workgroup_size,
             workgroup_size_overrides: None,
             function,
+            payload_type_handle: None,
+            incoming_payload_handle: None,
         });
 
         Ok(())
