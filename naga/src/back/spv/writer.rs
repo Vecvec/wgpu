@@ -1287,7 +1287,7 @@ impl Writer {
                 }
             }
             crate::TypeInner::AccelerationStructure { .. } => {
-                self.require_any("Acceleration Structure", &[spirv::Capability::RayQueryKHR])?;
+                self.require_any("Acceleration Structure", &[spirv::Capability::RayQueryKHR, spirv::Capability::RayTracingKHR])?;
             }
             crate::TypeInner::RayQuery { .. } => {
                 self.require_any("Ray Query", &[spirv::Capability::RayQueryKHR])?;
@@ -2387,16 +2387,19 @@ impl Writer {
             .iter()
             .flat_map(|entry| entry.function.arguments.iter())
             .any(|arg| has_view_index_check(ir_module, arg.binding.as_ref(), arg.ty));
-        let mut has_ray_query = ir_module.special_types.ray_desc.is_some()
-            | ir_module.special_types.ray_intersection.is_some();
+        let mut has_ray_query = ir_module.special_types.ray_intersection.is_some();
         let has_vertex_return = ir_module.special_types.ray_vertex_return.is_some();
+        // We might have ray tracing pipelines, or we may have ray queries, enable whichever one we can.
+        let mut has_ray_tracing_or_ray_query = ir_module.special_types.ray_desc.is_some();
 
         for (_, &crate::Type { ref inner, .. }) in ir_module.types.iter() {
             // spirv does not know whether these have vertex return - that is done by us
-            if let &crate::TypeInner::AccelerationStructure { .. }
-            | &crate::TypeInner::RayQuery { .. } = inner
+            if let &crate::TypeInner::RayQuery { .. } = inner
             {
                 has_ray_query = true
+            }
+            if let &crate::TypeInner::AccelerationStructure { .. } = inner {
+                has_ray_tracing_or_ray_query = true;
             }
         }
 
@@ -2410,6 +2413,17 @@ impl Writer {
             {
                 has_ray_tracing_pipeline = true;
             }
+        }
+
+        // If we don't have the capability, we probably shouldn't use the extension for it.
+        let ray_query_possible = self.capabilities_available.as_ref().map_or(true, |caps| caps.contains(&spirv::Capability::RayQueryKHR));
+        let ray_tracing_possible = self.capabilities_available.as_ref().map_or(true, |caps| caps.contains(&spirv::Capability::RayTracingKHR));
+
+        has_ray_query |= ray_query_possible && has_ray_tracing_or_ray_query;
+        has_ray_tracing_pipeline |= ray_tracing_possible && has_ray_tracing_or_ray_query;
+
+        if !(ray_query_possible || ray_tracing_possible) && has_ray_tracing_or_ray_query {
+            unreachable!()
         }
 
         if self.physical_layout.version < 0x10300 && has_storage_buffers {

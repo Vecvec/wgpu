@@ -831,6 +831,17 @@ fn adjust_stmt(new_pos: &HandleVec<Expression, Handle<Expression>>, stmt: &mut S
         | Statement::Kill
         | Statement::ControlBarrier(_)
         | Statement::MemoryBarrier(_) => {}
+        Statement::RayTracing(ref mut fun) => match *fun {
+            crate::RayTracingFunction::TraceRay {
+                ref mut acceleration_structure,
+                ref mut descriptor,
+                ref mut payload,
+            } => {
+                adjust(acceleration_structure);
+                adjust(descriptor);
+                adjust(payload);
+            }
+        },
     }
 }
 

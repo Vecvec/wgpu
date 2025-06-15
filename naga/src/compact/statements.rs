@@ -153,6 +153,10 @@ impl FunctionTracer<'_> {
                         self.expressions_used.insert(result);
                     }
 
+                    St::RayTracing(ref fun) => {
+                        self.trace_ray_tracing_function(fun);
+                    }
+
                     // Trivial statements.
                     St::Break
                     | St::Continue
@@ -202,6 +206,19 @@ impl FunctionTracer<'_> {
             }
             Qf::ConfirmIntersection => {}
             Qf::Terminate => {}
+        }
+    }
+    fn trace_ray_tracing_function(&mut self, fun: &crate::RayTracingFunction) {
+        match *fun {
+            crate::RayTracingFunction::TraceRay {
+                acceleration_structure,
+                descriptor,
+                payload,
+            } => {
+                self.expressions_used.insert(acceleration_structure);
+                self.expressions_used.insert(descriptor);
+                self.expressions_used.insert(payload);
+            }
         }
     }
 }
@@ -371,6 +388,7 @@ impl FunctionMap {
                         adjust(argument);
                         adjust(result);
                     }
+                    St::RayTracing(ref mut fun) => self.adjust_ray_tracing_function(fun),
 
                     // Trivial statements.
                     St::Break
@@ -421,6 +439,20 @@ impl FunctionMap {
             }
             Qf::ConfirmIntersection => {}
             Qf::Terminate => {}
+        }
+    }
+    fn adjust_ray_tracing_function(&self, fun: &mut crate::RayTracingFunction) {
+        use crate::RayTracingFunction as Rf;
+        match *fun {
+            Rf::TraceRay {
+                ref mut acceleration_structure,
+                ref mut descriptor,
+                ref mut payload,
+            } => {
+                self.expressions.adjust(acceleration_structure);
+                self.expressions.adjust(descriptor);
+                self.expressions.adjust(payload);
+            }
         }
     }
 }

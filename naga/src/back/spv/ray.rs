@@ -557,6 +557,101 @@ impl BlockContext<'_> {
         }
     }
 
+    pub(super) fn write_ray_tracing_function(
+        &mut self,
+        function: &crate::RayTracingFunction,
+        block: &mut Block,
+    ) {
+        match *function {
+            crate::RayTracingFunction::TraceRay {
+                acceleration_structure,
+                descriptor,
+                payload,
+            } => {
+                let payload_id = match self.ir_function.expressions[payload] {
+                    crate::Expression::GlobalVariable(global) => {
+                        self.writer.global_variables[global].var_id
+                    }
+                    _ => unreachable!("payload must be a pointer to a global variable"),
+                };
+                //Note: composite extract indices and types must match `generate_ray_desc_type`
+                let desc_id = self.cached[descriptor];
+                let acc_struct_id = self.get_handle_id(acceleration_structure);
+
+                let flag_type_id =
+                    self.get_numeric_type_id(NumericType::Scalar(crate::Scalar::U32));
+                let ray_flags_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    flag_type_id,
+                    ray_flags_id,
+                    desc_id,
+                    &[0],
+                ));
+                let cull_mask_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    flag_type_id,
+                    cull_mask_id,
+                    desc_id,
+                    &[1],
+                ));
+
+                let scalar_type_id =
+                    self.get_numeric_type_id(NumericType::Scalar(crate::Scalar::F32));
+                let tmin_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    scalar_type_id,
+                    tmin_id,
+                    desc_id,
+                    &[2],
+                ));
+                let tmax_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    scalar_type_id,
+                    tmax_id,
+                    desc_id,
+                    &[3],
+                ));
+
+                let vector_type_id = self.get_numeric_type_id(NumericType::Vector {
+                    size: crate::VectorSize::Tri,
+                    scalar: crate::Scalar::F32,
+                });
+                let ray_origin_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    vector_type_id,
+                    ray_origin_id,
+                    desc_id,
+                    &[4],
+                ));
+                let ray_dir_id = self.gen_id();
+                block.body.push(Instruction::composite_extract(
+                    vector_type_id,
+                    ray_dir_id,
+                    desc_id,
+                    &[5],
+                ));
+
+                let sbt_offset = self.writer.get_constant_scalar(crate::Literal::I32(0));
+                let miss_idx = self.writer.get_constant_scalar(crate::Literal::I32(0));
+                let sbt_stride = self.writer.get_constant_scalar(crate::Literal::I32(1));
+
+                block.body.push(Instruction::trace_rays(
+                    acc_struct_id,
+                    ray_flags_id,
+                    cull_mask_id,
+                    sbt_offset,
+                    sbt_stride,
+                    miss_idx,
+                    ray_origin_id,
+                    tmin_id,
+                    ray_dir_id,
+                    tmax_id,
+                    payload_id,
+                ));
+            }
+        }
+    }
+
     pub(super) fn write_ray_query_return_vertex_position(
         &mut self,
         query: Handle<crate::Expression>,

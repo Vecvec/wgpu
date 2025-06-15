@@ -1153,6 +1153,20 @@ impl FunctionInfo {
                     }
                     FunctionUniformity::new()
                 }
+                S::RayTracing(ref fun) => {
+                    match *fun {
+                        crate::RayTracingFunction::TraceRay {
+                            acceleration_structure,
+                            descriptor,
+                            payload,
+                        } => {
+                            let _ = self.add_ref(acceleration_structure);
+                            let _ = self.add_ref(descriptor);
+                            let _ = self.add_ref(payload);
+                        }
+                    }
+                    FunctionUniformity::new()
+                }
             };
 
             disruptor = disruptor.or(uniformity.exit_disruptor());

@@ -15,7 +15,11 @@ fn ray_gen_with_unused_payload_type() {}
 @payload_type(Payload)
 fn ray_gen() {
     payload.payload = 5;
+    traceRays(acc_struct, RayDesc(), &payload);
 }
+
+@group(0) @binding(0)
+var acc_struct: acceleration_structure;
 
 @ray_closest_hit
 @incoming_payload(incoming_payload)
@@ -28,6 +32,7 @@ fn closest_hit() {
 @payload_type(Payload)
 fn closest_hit_same_payload() {
     incoming_payload.payload++;
+    traceRays(acc_struct, RayDesc(), &incoming_payload);
 }
 
 @ray_closest_hit
@@ -36,6 +41,7 @@ fn closest_hit_same_payload() {
 fn closest_hit_different_payload() {
     payload.payload = 3;
     incoming_payload.payload++;
+    traceRays(acc_struct, RayDesc(), &payload);
 }
 
 var<incoming_ray_payload> incoming_payload: Payload;

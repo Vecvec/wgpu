@@ -1794,6 +1794,33 @@ pub enum RayQueryFunction {
     Terminate,
 }
 
+/// An operation in a ray tracing pipeline
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[cfg_attr(feature = "deserialize", derive(Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(Arbitrary))]
+pub enum RayTracingFunction {
+    TraceRay {
+        /// The acceleration structure within which this should search for hits in.
+        ///
+        /// The expression must be an [`AccelerationStructure`].
+        ///
+        /// [`AccelerationStructure`]: TypeInner::AccelerationStructure
+        acceleration_structure: Handle<Expression>,
+
+        #[allow(rustdoc::private_intra_doc_links)]
+        /// A struct of detailed parameters for the ray trace.
+        ///
+        /// This expression should have the struct type given in
+        /// [`SpecialTypes::ray_desc`]. This is available in the WGSL
+        /// front end as the `RayDesc` type.
+        descriptor: Handle<Expression>,
+
+        /// The payload to go into the next stages of the pipeline
+        payload: Handle<Expression>,
+    },
+}
+
 //TODO: consider removing `Clone`. It's not valid to clone `Statement::Emit` anyway.
 /// Instructions which make up an executable block.
 ///
@@ -2154,6 +2181,7 @@ pub enum Statement {
         /// [`SubgroupOperationResult`]: Expression::SubgroupOperationResult
         result: Handle<Expression>,
     },
+    RayTracing(RayTracingFunction),
 }
 
 /// A function argument.

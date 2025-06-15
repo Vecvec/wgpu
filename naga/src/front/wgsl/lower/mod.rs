@@ -3055,6 +3055,27 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                                 committed: false,
                             }
                         }
+                        "traceRays" => {
+                            let mut args = ctx.prepare_args(arguments, 3, span);
+                            let acceleration_structure = self.expression(args.next()?, ctx)?;
+                            let descriptor = self.expression(args.next()?, ctx)?;
+                            let payload = self.expression(args.next()?, ctx)?;
+                            args.finish()?;
+
+                            let _ = ctx.module.generate_ray_desc_type();
+                            let fun = ir::RayTracingFunction::TraceRay {
+                                acceleration_structure,
+                                descriptor,
+                                payload,
+                            };
+
+                            let rctx = ctx.runtime_expression_ctx(span)?;
+                            rctx.block
+                                .extend(rctx.emitter.finish(&rctx.function.expressions));
+                            rctx.emitter.start(&rctx.function.expressions);
+                            rctx.block.push(ir::Statement::RayTracing(fun), span);
+                            return Ok(None);
+                        }
                         "RayDesc" => {
                             let ty = ctx.module.generate_ray_desc_type();
                             let handle = self.construct(

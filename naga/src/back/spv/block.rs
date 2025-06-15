@@ -3647,6 +3647,9 @@ impl BlockContext<'_> {
                 } => {
                     self.write_subgroup_gather(mode, argument, result, &mut block)?;
                 }
+                Statement::RayTracing(ref fun) => {
+                    self.write_ray_tracing_function(fun, &mut block);
+                }
             }
         }
 

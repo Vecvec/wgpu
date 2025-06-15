@@ -10,6 +10,7 @@ use crate::arena::{Handle, HandleSet};
 use crate::proc::TypeResolution;
 use crate::span::WithSpan;
 use crate::span::{AddSpan as _, MapErrWithSpan as _};
+use crate::RayTracingFunction;
 
 #[derive(Clone, Debug, thiserror::Error)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -1473,6 +1474,9 @@ impl super::Validator {
                     }
                 }
                 S::RayQuery { query, ref fun } => {
+                    stages &= super::ShaderStages::VERTEX
+                        | super::ShaderStages::FRAGMENT
+                        | super::ShaderStages::COMPUTE;
                     let query_var = match *context.get_expression(query) {
                         crate::Expression::LocalVariable(var) => &context.local_vars[var],
                         ref other => {
@@ -1620,6 +1624,51 @@ impl super::Validator {
                     }
                     self.validate_subgroup_gather(mode, argument, result, context)?;
                 }
+                S::RayTracing(ref fun) => match *fun {
+                    RayTracingFunction::TraceRay {
+                        acceleration_structure,
+                        descriptor,
+                        payload,
+                    } => {
+                        stages &= super::ShaderStages::RAY_GENERATION
+                            | super::ShaderStages::RAY_CLOSEST_HIT
+                            | super::ShaderStages::RAY_MISS;
+                        match *context.resolve_type_inner(
+                            acceleration_structure,
+                            &self.valid_expression_set,
+                        )? {
+                            Ti::AccelerationStructure { .. } => {}
+                            _ => {
+                                return Err(FunctionError::InvalidAccelerationStructure(
+                                    acceleration_structure,
+                                )
+                                .with_span_static(span, "invalid acceleration structure"))
+                            }
+                        }
+                        let desc_ty_given =
+                            context.resolve_type_inner(descriptor, &self.valid_expression_set)?;
+                        let desc_ty_expected = context
+                            .special_types
+                            .ray_desc
+                            .map(|handle| &context.types[handle].inner);
+                        if Some(desc_ty_given) != desc_ty_expected {
+                            return Err(FunctionError::InvalidRayDescriptor(descriptor)
+                                .with_span_static(span, "invalid ray descriptor"));
+                        }
+                        match *context.resolve_type_inner(
+                            payload,
+                            &self.valid_expression_set,
+                        )? {
+                            Ti::Pointer { space: AddressSpace::RayPayload | AddressSpace::IncomingRayPayload, .. } => {}
+                            _ => {
+                                return Err(FunctionError::InvalidAccelerationStructure(
+                                    acceleration_structure,
+                                )
+                                    .with_span_static(span, "invalid acceleration structure"))
+                            }
+                        }
+                    }
+                },
             }
         }
         Ok(BlockInfo { stages })

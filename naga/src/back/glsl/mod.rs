@@ -2828,6 +2828,9 @@ impl<'a, W: Write> Writer<'a, W> {
                 }
                 writeln!(self.out, ");")?;
             }
+            Statement::RayTracing(_) => {
+                return Err(Error::Custom("Ray tracing not implemented".to_string()))
+            }
         }
 
         Ok(())
