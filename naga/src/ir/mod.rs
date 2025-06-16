@@ -1975,6 +1975,12 @@ pub enum Statement {
     /// [`Loop`]: Statement::Loop
     Kill,
 
+    /// Discards the current potential hit, continuing the search.
+    DiscardHit,
+
+    /// Aborts the current shader execution.
+    AcceptHitEndSearch,
+
     /// Synchronize invocations within the work group.
     /// The `Barrier` flags control which memory accesses should be synchronized.
     /// If empty, this becomes purely an execution barrier.

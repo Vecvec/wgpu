@@ -2457,6 +2457,16 @@ impl Parser {
                             lexer.expect(Token::Separator(';'))?;
                             ast::StatementKind::Kill
                         }
+                        "discard_hit" => {
+                            let _ = lexer.next();
+                            lexer.expect(Token::Separator(';'))?;
+                            ast::StatementKind::DiscardHit
+                        }
+                        "accept_hit_end_search" => {
+                            let _ = lexer.next();
+                            lexer.expect(Token::Separator(';'))?;
+                            ast::StatementKind::AcceptHitEndSearch
+                        }
                         // https://www.w3.org/TR/WGSL/#const-assert-statement
                         "const_assert" => {
                             let _ = lexer.next();

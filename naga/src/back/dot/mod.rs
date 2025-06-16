@@ -93,6 +93,8 @@ impl StatementGraph {
                     "Emit"
                 }
                 S::Kill => "Kill", //TODO: link to the beginning
+                S::DiscardHit => "DiscardHit",
+                S::AcceptHitEndSearch => "AcceptHitEndSearch",
                 S::Break => {
                     // Try to link to the break target, otherwise produce
                     // a broken connection

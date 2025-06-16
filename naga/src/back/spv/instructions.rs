@@ -1139,6 +1139,14 @@ impl super::Instruction {
         Self::new(Op::Kill)
     }
 
+    pub(super) const fn ignore_intersection() -> Self {
+        Self::new(Op::IgnoreIntersectionKHR)
+    }
+
+    pub(super) const fn terminate_ray() -> Self {
+        Self::new(Op::TerminateRayKHR)
+    }
+
     pub(super) const fn return_void() -> Self {
         Self::new(Op::Return)
     }

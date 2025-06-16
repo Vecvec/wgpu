@@ -830,7 +830,9 @@ fn adjust_stmt(new_pos: &HandleVec<Expression, Handle<Expression>>, stmt: &mut S
         | Statement::Continue
         | Statement::Kill
         | Statement::ControlBarrier(_)
-        | Statement::MemoryBarrier(_) => {}
+        | Statement::MemoryBarrier(_)
+        | Statement::DiscardHit
+        | Statement::AcceptHitEndSearch => {}
         Statement::RayTracing(ref mut fun) => match *fun {
             crate::RayTracingFunction::TraceRay {
                 ref mut acceleration_structure,

@@ -4646,8 +4646,7 @@ impl<I: Iterator<Item = u32>> Frontend<I> {
                         }
                     }
                 }
-                S::WorkGroupUniformLoad { .. } => unreachable!(),
-                S::RayTracing(_) => unreachable!(),
+                S::WorkGroupUniformLoad { .. } | S::DiscardHit | S::AcceptHitEndSearch | S::RayTracing(_) => unreachable!(),
             }
             i += 1;
         }

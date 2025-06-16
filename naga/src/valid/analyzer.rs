@@ -70,10 +70,12 @@ bitflags::bitflags! {
         /// subsequent statements within the current function (only!)
         /// to be executed in a non-uniform control flow.
         const MAY_RETURN = 0x1;
-        /// Control flow may be killed. Anything after [`Statement::Kill`] is
-        /// considered inside non-uniform context.
+        /// Control flow may be killed. Anything after [`Statement::Kill`], [`Statement::DiscardRay`]
+        /// or [`Statement::AcceptHitEndSearch`] is considered inside non-uniform context.
         ///
         /// [`Statement::Kill`]: crate::Statement::Kill
+        /// [`Statement::DiscardRay`]: crate::Statement::DiscardRay
+        /// [`Statement::AcceptHitEndSearch`]: crate::Statement::KAcceptHitEndSearchill
         const MAY_KILL = 0x2;
     }
 }
@@ -897,7 +899,7 @@ impl FunctionInfo {
                     }
                 }
                 S::Break | S::Continue => FunctionUniformity::new(),
-                S::Kill => FunctionUniformity {
+                S::Kill | S::DiscardHit | S::AcceptHitEndSearch => FunctionUniformity {
                     result: Uniformity::new(),
                     exit: if disruptor.is_some() {
                         ExitFlags::MAY_KILL

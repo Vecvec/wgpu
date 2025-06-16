@@ -163,7 +163,9 @@ impl FunctionTracer<'_> {
                     | St::Kill
                     | St::ControlBarrier(_)
                     | St::MemoryBarrier(_)
-                    | St::Return { value: None } => {}
+                    | St::Return { value: None }
+                    | St::DiscardHit
+                    | St::AcceptHitEndSearch => {}
                 }
             }
         }
@@ -396,7 +398,9 @@ impl FunctionMap {
                     | St::Kill
                     | St::ControlBarrier(_)
                     | St::MemoryBarrier(_)
-                    | St::Return { value: None } => {}
+                    | St::Return { value: None }
+                    | St::DiscardHit
+                    | St::AcceptHitEndSearch => {}
                 }
             }
         }

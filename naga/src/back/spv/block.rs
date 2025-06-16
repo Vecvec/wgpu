@@ -3242,6 +3242,14 @@ impl BlockContext<'_> {
                     self.function.consume(block, Instruction::kill());
                     return Ok(BlockExitDisposition::Discarded);
                 }
+                Statement::DiscardHit => {
+                    self.function.consume(block, Instruction::ignore_intersection());
+                    return Ok(BlockExitDisposition::Discarded);
+                }
+                Statement::AcceptHitEndSearch => {
+                    self.function.consume(block, Instruction::terminate_ray());
+                    return Ok(BlockExitDisposition::Discarded);
+                }
                 Statement::ControlBarrier(flags) => {
                     self.writer.write_control_barrier(flags, &mut block);
                 }

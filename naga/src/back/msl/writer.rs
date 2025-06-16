@@ -4163,6 +4163,7 @@ impl<W: Write> Writer<W> {
                     }
                     writeln!(self.out, ");")?;
                 }
+                crate::Statement::DiscardHit | crate::Statement::AcceptHitEndSearch |
                 crate::Statement::RayTracing(_) => {
                     return Err(Error::FeatureNotImplemented(
                         "Ray tracing pipelines".to_string(),

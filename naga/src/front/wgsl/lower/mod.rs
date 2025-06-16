@@ -1900,6 +1900,8 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 ir::Statement::Return { value }
             }
             ast::StatementKind::Kill => ir::Statement::Kill,
+            ast::StatementKind::DiscardHit => ir::Statement::DiscardHit,
+            ast::StatementKind::AcceptHitEndSearch => ir::Statement::AcceptHitEndSearch,
             ast::StatementKind::Call {
                 ref function,
                 ref arguments,

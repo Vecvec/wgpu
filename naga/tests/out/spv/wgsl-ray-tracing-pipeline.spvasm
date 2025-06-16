@@ -1,7 +1,7 @@
 ; SPIR-V
 ; Version: 1.4
 ; Generator: rspirv
-; Bound: 179
+; Bound: 192
 OpCapability Shader
 OpCapability RayQueryKHR
 OpCapability RayTracingKHR
@@ -17,7 +17,7 @@ OpEntryPoint ClosestHitNV %84 "closest_hit" %48 %50 %52 %55 %57 %60 %62 %64 %66 
 OpEntryPoint ClosestHitNV %93 "closest_hit_same_payload" %13 %15
 OpEntryPoint ClosestHitNV %107 "closest_hit_different_payload" %11 %13 %15
 OpEntryPoint AnyHitNV %155 "any_hit" %123 %125 %127 %129 %131 %133 %135 %137 %139 %141 %143 %145 %147 %149 %151 %153 %15
-OpEntryPoint MissNV %176 "miss" %162 %164 %166 %168 %170 %172 %174 %15
+OpEntryPoint MissNV %189 "miss" %175 %177 %179 %181 %183 %185 %187 %15
 OpMemberDecorate %4 0 Offset 0
 OpMemberDecorate %9 0 Offset 0
 OpMemberDecorate %9 1 Offset 4
@@ -61,13 +61,13 @@ OpDecorate %147 BuiltIn IncomingRayFlagsNV
 OpDecorate %149 BuiltIn InstanceId
 OpDecorate %151 BuiltIn RayGeometryIndexKHR
 OpDecorate %153 BuiltIn PrimitiveId
-OpDecorate %162 BuiltIn LaunchSizeNV
-OpDecorate %164 BuiltIn LaunchIdNV
-OpDecorate %166 BuiltIn WorldRayOriginNV
-OpDecorate %168 BuiltIn WorldRayDirectionNV
-OpDecorate %170 BuiltIn RayTminNV
-OpDecorate %172 BuiltIn RayTminNV
-OpDecorate %174 BuiltIn IncomingRayFlagsNV
+OpDecorate %175 BuiltIn LaunchSizeNV
+OpDecorate %177 BuiltIn LaunchIdNV
+OpDecorate %179 BuiltIn WorldRayOriginNV
+OpDecorate %181 BuiltIn WorldRayDirectionNV
+OpDecorate %183 BuiltIn RayTminNV
+OpDecorate %185 BuiltIn RayTminNV
+OpDecorate %187 BuiltIn IncomingRayFlagsNV
 %2 = OpTypeVoid
 %3 = OpTypeInt 32 0
 %4 = OpTypeStruct %3
@@ -133,13 +133,15 @@ OpDecorate %174 BuiltIn IncomingRayFlagsNV
 %149 = OpVariable  %72  Input
 %151 = OpVariable  %72  Input
 %153 = OpVariable  %72  Input
-%162 = OpVariable  %23  Input
-%164 = OpVariable  %23  Input
-%166 = OpVariable  %53  Input
-%168 = OpVariable  %53  Input
-%170 = OpVariable  %58  Input
-%172 = OpVariable  %58  Input
-%174 = OpVariable  %72  Input
+%156 = OpConstant  %3  2
+%158 = OpTypeBool
+%175 = OpVariable  %23  Input
+%177 = OpVariable  %23  Input
+%179 = OpVariable  %53  Input
+%181 = OpVariable  %53  Input
+%183 = OpVariable  %58  Input
+%185 = OpVariable  %58  Input
+%187 = OpVariable  %72  Input
 %18 = OpFunction  %2  None %19
 %17 = OpLabel
 OpBranch %20
@@ -255,27 +257,49 @@ OpFunctionEnd
 %150 = OpLoad  %3  %149
 %152 = OpLoad  %3  %151
 %154 = OpLoad  %3  %153
-OpBranch %156
-%156 = OpLabel
-%157 = OpAccessChain  %87  %15 %36
-%158 = OpLoad  %3  %157
-%159 = OpIAdd  %3  %158 %85
-%160 = OpAccessChain  %87  %15 %36
-OpStore %160 %159
+OpBranch %157
+%157 = OpLabel
+%159 = OpIEqual  %158  %144 %36
+OpSelectionMerge %160 None
+OpBranchConditional %159 %161 %162
+%161 = OpLabel
+OpReturn
+%162 = OpLabel
+%163 = OpIEqual  %158  %144 %85
+OpSelectionMerge %164 None
+OpBranchConditional %163 %165 %166
+%165 = OpLabel
+OpIgnoreIntersectionKHR
+%166 = OpLabel
+%167 = OpIEqual  %158  %144 %156
+OpSelectionMerge %168 None
+OpBranchConditional %167 %169 %168
+%169 = OpLabel
+OpTerminateRayKHR
+%168 = OpLabel
+OpBranch %164
+%164 = OpLabel
+OpBranch %160
+%160 = OpLabel
+%170 = OpAccessChain  %87  %15 %36
+%171 = OpLoad  %3  %170
+%172 = OpIAdd  %3  %171 %85
+%173 = OpAccessChain  %87  %15 %36
+OpStore %173 %172
 OpReturn
 OpFunctionEnd
-%176 = OpFunction  %2  None %19
-%161 = OpLabel
-%163 = OpLoad  %5  %162
-%165 = OpLoad  %5  %164
-%167 = OpLoad  %8  %166
-%169 = OpLoad  %8  %168
-%171 = OpLoad  %7  %170
-%173 = OpLoad  %7  %172
-%175 = OpLoad  %3  %174
-OpBranch %177
-%177 = OpLabel
-%178 = OpAccessChain  %87  %15 %36
-OpStore %178 %36
+%189 = OpFunction  %2  None %19
+%174 = OpLabel
+%176 = OpLoad  %5  %175
+%178 = OpLoad  %5  %177
+%180 = OpLoad  %8  %179
+%182 = OpLoad  %8  %181
+%184 = OpLoad  %7  %183
+%186 = OpLoad  %7  %185
+%188 = OpLoad  %3  %187
+OpBranch %190
+%190 = OpLabel
+%191 = OpAccessChain  %87  %15 %36
+OpStore %191 %36
 OpReturn
 OpFunctionEnd

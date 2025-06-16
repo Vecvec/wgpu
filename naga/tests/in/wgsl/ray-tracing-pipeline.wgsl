@@ -87,6 +87,13 @@ fn any_hit(
     @builtin(geometry_index) geometry_idx: u32,
     @builtin(primitive_index) primitive_index: u32,
 ) {
+    if (data == 0) {
+        return;
+    } else if (data == 1) {
+        discard_hit;
+    } else if (data == 2) {
+        accept_hit_end_search;
+    }
     incoming_payload.payload++;
 }
 

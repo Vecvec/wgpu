@@ -977,7 +977,7 @@ impl<W: Write> Writer<W> {
                 }
                 writeln!(self.out, ");")?;
             }
-            Statement::RayTracing(_) => unreachable!(),
+            Statement::DiscardHit | Statement::AcceptHitEndSearch | Statement::RayTracing(_) => unreachable!(),
         }
 
         Ok(())

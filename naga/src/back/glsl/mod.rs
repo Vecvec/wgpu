@@ -2828,6 +2828,7 @@ impl<'a, W: Write> Writer<'a, W> {
                 }
                 writeln!(self.out, ");")?;
             }
+            Statement::DiscardHit | Statement::AcceptHitEndSearch |
             Statement::RayTracing(_) => {
                 return Err(Error::Custom("Ray tracing not implemented".to_string()))
             }
