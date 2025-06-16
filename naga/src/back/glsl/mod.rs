@@ -5270,6 +5270,22 @@ const fn glsl_built_in(built_in: crate::BuiltIn, options: VaryingOptions) -> &'s
         Bi::SubgroupId => "gl_SubgroupID",
         Bi::SubgroupSize => "gl_SubgroupSize",
         Bi::SubgroupInvocationId => "gl_SubgroupInvocationID",
+        // ray tracing pipelines are unimplemented
+        Bi::RayLaunchId
+        | Bi::RayLaunchSize
+        | Bi::WorldRayOrigin
+        | Bi::WorldRayDirection
+        | Bi::TMin
+        | Bi::TMax
+        | Bi::ObjectRayOrigin
+        | Bi::ObjectRayDirection
+        | Bi::ObjectToWorld
+        | Bi::WorldToObject
+        | Bi::InstanceCustomData
+        | Bi::T
+        | Bi::HitKind
+        | Bi::IncomingFlags
+        | Bi::GeometryIndex => "",
     }
 }
 

@@ -51,6 +51,22 @@ pub fn map_built_in(
         "subgroup_id" => crate::BuiltIn::SubgroupId,
         "subgroup_size" => crate::BuiltIn::SubgroupSize,
         "subgroup_invocation_id" => crate::BuiltIn::SubgroupInvocationId,
+        // ray tracing pipeline
+        "ray_launch_id" => crate::BuiltIn::RayLaunchId,
+        "ray_launch_size" => crate::BuiltIn::RayLaunchSize,
+        "world_ray_origin" => crate::BuiltIn::WorldRayOrigin,
+        "world_ray_direction" => crate::BuiltIn::WorldRayDirection,
+        "t_min" => crate::BuiltIn::TMin,
+        "t_max" => crate::BuiltIn::TMax,
+        "t" => crate::BuiltIn::T,
+        "object_ray_origin" => crate::BuiltIn::ObjectRayOrigin,
+        "object_ray_direction" => crate::BuiltIn::ObjectRayDirection,
+        "object_to_world" => crate::BuiltIn::ObjectToWorld,
+        "world_to_object" => crate::BuiltIn::WorldToObject,
+        "instance_custom_data" => crate::BuiltIn::InstanceCustomData,
+        "hit_kind" => crate::BuiltIn::HitKind,
+        "incoming_flags" => crate::BuiltIn::IncomingFlags,
+        "geometry_index" => crate::BuiltIn::GeometryIndex,
         _ => return Err(Box::new(Error::UnknownBuiltin(span))),
     };
     match built_in {

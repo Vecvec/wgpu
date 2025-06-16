@@ -408,7 +408,7 @@ impl StatementGraph {
                     RayTracingFunction::TraceRay {
                         acceleration_structure,
                         descriptor,
-                        payload
+                        payload,
                     } => {
                         self.dependencies.push((
                             id,

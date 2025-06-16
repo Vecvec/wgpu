@@ -372,6 +372,7 @@ pub enum BuiltIn {
     BaseVertex,
     ClipDistance,
     CullDistance,
+    // `InstanceIndex` is also allowed in the `ray_*_hit` shaders
     InstanceIndex,
     PointSize,
     VertexIndex,
@@ -380,6 +381,7 @@ pub enum BuiltIn {
     FragDepth,
     PointCoord,
     FrontFacing,
+    // `PrimitiveIndex` is also allowed in the `ray_*_hit` shaders
     PrimitiveIndex,
     SampleIndex,
     SampleMask,
@@ -395,6 +397,25 @@ pub enum BuiltIn {
     SubgroupId,
     SubgroupSize,
     SubgroupInvocationId,
+    // all ray tracing pipeline stages
+    RayLaunchId,
+    RayLaunchSize,
+    // ray closest hit, any hit, miss
+    WorldRayOrigin,
+    WorldRayDirection,
+    TMin,
+    // ray miss
+    TMax,
+    // ray closest hit, any hit
+    T,
+    ObjectRayOrigin,
+    ObjectRayDirection,
+    ObjectToWorld,
+    WorldToObject,
+    InstanceCustomData,
+    HitKind,
+    IncomingFlags,
+    GeometryIndex,
 }
 
 /// Number of bytes per scalar.
@@ -1942,7 +1963,9 @@ pub enum Statement {
     /// [`Loop`] statement.
     ///
     /// [`Loop`]: Statement::Loop
-    Return { value: Option<Handle<Expression>> },
+    Return {
+        value: Option<Handle<Expression>>,
+    },
 
     /// Aborts the current shader execution.
     ///

@@ -221,12 +221,15 @@ impl VaryingContext<'_> {
                 }
 
                 let (visible, type_good) = match built_in {
-                    Bi::BaseInstance
-                    | Bi::BaseVertex
-                    | Bi::InstanceIndex
-                    | Bi::VertexIndex
-                    | Bi::DrawID => (
+                    Bi::BaseInstance | Bi::BaseVertex | Bi::VertexIndex | Bi::DrawID => (
                         self.stage == St::Vertex && !self.output,
+                        *ty_inner == Ti::Scalar(crate::Scalar::U32),
+                    ),
+                    Bi::InstanceIndex => (
+                        (self.stage == St::Vertex
+                            || self.stage == St::RayClosestHit
+                            || self.stage == St::RayAnyHit)
+                            && !self.output,
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::ClipDistance | Bi::CullDistance => (
@@ -292,7 +295,10 @@ impl VaryingContext<'_> {
                         *ty_inner == Ti::Scalar(crate::Scalar::BOOL),
                     ),
                     Bi::PrimitiveIndex => (
-                        self.stage == St::Fragment && !self.output,
+                        (self.stage == St::Fragment
+                            || self.stage == St::RayClosestHit
+                            || self.stage == St::RayAnyHit)
+                            && !self.output,
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::SampleIndex => (
@@ -332,6 +338,69 @@ impl VaryingContext<'_> {
                             | St::RayAnyHit
                             | St::RayMiss => false,
                             St::Task | St::Mesh => unreachable!(),
+                        },
+                        *ty_inner == Ti::Scalar(crate::Scalar::U32),
+                    ),
+                    Bi::RayLaunchId | Bi::RayLaunchSize => (
+                        match self.stage {
+                            St::RayGeneration | St::RayClosestHit | St::RayAnyHit | St::RayMiss => !self.output,
+                            St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                        },
+                        *ty_inner == Ti::Vector { scalar:crate::Scalar::U32, size: crate::VectorSize::Tri },
+                    ),
+                    Bi::WorldRayOrigin | Bi::WorldRayDirection => (
+                        match self.stage {
+                            St::RayClosestHit | St::RayAnyHit | St::RayMiss => !self.output,
+                            St::RayGeneration | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                        },
+                        *ty_inner == Ti::Vector { scalar:crate::Scalar::F32, size: crate::VectorSize::Tri },
+                    ),
+                    Bi::ObjectRayOrigin | Bi::ObjectRayDirection => (
+                        match self.stage {
+                            St::RayClosestHit | St::RayAnyHit => !self.output,
+                            St::RayGeneration | St::RayMiss | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                        },
+                        *ty_inner == Ti::Vector { scalar:crate::Scalar::F32, size: crate::VectorSize::Tri },
+                    ),
+                    Bi::TMin => (
+                        match self.stage {
+                            St::RayClosestHit | St::RayAnyHit | St::RayMiss => !self.output,
+                            St::RayGeneration | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                        },
+                        *ty_inner == Ti::Scalar(crate::Scalar::F32),
+                    ),
+                    Bi::TMax => (
+                        match self.stage {
+                            St::RayMiss => !self.output,
+                            St::RayGeneration | St::RayClosestHit | St::RayAnyHit | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                        },
+                        *ty_inner == Ti::Scalar(crate::Scalar::F32),
+                    ),
+                    Bi::T => (
+                        match self.stage {
+                            St::RayClosestHit | St::RayAnyHit => !self.output,
+                            St::RayGeneration | St::RayMiss | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                        },
+                        *ty_inner == Ti::Scalar(crate::Scalar::F32),
+                    ),
+                    Bi::ObjectToWorld | Bi::WorldToObject => (
+                        match self.stage {
+                            St::RayClosestHit | St::RayAnyHit => !self.output,
+                            St::RayGeneration | St::RayMiss | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                        },
+                        *ty_inner == Ti::Matrix { scalar: crate::Scalar::F32, rows: crate::VectorSize::Tri, columns: crate::VectorSize::Quad },
+                    ),
+                    Bi::IncomingFlags => (
+                        match self.stage {
+                            St::RayClosestHit | St::RayAnyHit | St::RayMiss => !self.output,
+                            St::RayGeneration | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                        },
+                        *ty_inner == Ti::Scalar(crate::Scalar::U32),
+                    ),
+                    Bi::InstanceCustomData | Bi::HitKind | Bi::GeometryIndex => (
+                        match self.stage {
+                            St::RayClosestHit | St::RayAnyHit => !self.output,
+                            St::RayGeneration | St::RayMiss | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
@@ -835,7 +904,9 @@ impl super::Validator {
             | crate::ShaderStage::Fragment
             | crate::ShaderStage::Compute => {
                 if ep.payload_type_handle.is_some() {
-                    return Err(EntryPointError::DisallowedPayloadTypeAttribute(ep.stage).with_span());
+                    return Err(
+                        EntryPointError::DisallowedPayloadTypeAttribute(ep.stage).with_span()
+                    );
                 }
                 if ep.incoming_payload_handle.is_some() {
                     return Err(
@@ -860,7 +931,11 @@ impl super::Validator {
                     Some(handle) => {
                         if let Some(payload_ty) = ep.payload_type_handle {
                             if module.global_variables[handle].ty != payload_ty {
-                                return Err(EntryPointError::MismatchedPayloadAttributes(module.global_variables[handle].ty, payload_ty).with_span())
+                                return Err(EntryPointError::MismatchedPayloadAttributes(
+                                    module.global_variables[handle].ty,
+                                    payload_ty,
+                                )
+                                .with_span());
                             }
                         }
                     }
@@ -868,7 +943,9 @@ impl super::Validator {
             }
             crate::ShaderStage::RayAnyHit => {
                 if ep.payload_type_handle.is_some() {
-                    return Err(EntryPointError::DisallowedPayloadTypeAttribute(ep.stage).with_span());
+                    return Err(
+                        EntryPointError::DisallowedPayloadTypeAttribute(ep.stage).with_span()
+                    );
                 }
             }
             crate::ShaderStage::Mesh | crate::ShaderStage::Task => unreachable!(),

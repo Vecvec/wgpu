@@ -183,6 +183,26 @@ impl crate::BuiltIn {
             Self::PointSize | Self::ViewIndex | Self::PointCoord | Self::DrawID => {
                 return Err(Error::Custom(format!("Unsupported builtin {self:?}")))
             }
+            // ray tracing
+            crate::ir::BuiltIn::RayLaunchId
+            | crate::ir::BuiltIn::RayLaunchSize
+            | crate::ir::BuiltIn::WorldRayOrigin
+            | crate::ir::BuiltIn::WorldRayDirection
+            | crate::ir::BuiltIn::TMin
+            | crate::ir::BuiltIn::TMax
+            | crate::ir::BuiltIn::ObjectRayOrigin
+            | crate::ir::BuiltIn::ObjectRayDirection
+            | crate::ir::BuiltIn::ObjectToWorld
+            | crate::ir::BuiltIn::WorldToObject
+            | crate::ir::BuiltIn::InstanceCustomData
+            | crate::ir::BuiltIn::T
+            | crate::ir::BuiltIn::HitKind
+            | crate::ir::BuiltIn::IncomingFlags
+            | crate::ir::BuiltIn::GeometryIndex => {
+                return Err(Error::Unimplemented(format!(
+                    "ray tracing pipeline builtin {self:?}"
+                )))
+            }
         })
     }
 }

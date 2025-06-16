@@ -1287,7 +1287,13 @@ impl Writer {
                 }
             }
             crate::TypeInner::AccelerationStructure { .. } => {
-                self.require_any("Acceleration Structure", &[spirv::Capability::RayQueryKHR, spirv::Capability::RayTracingKHR])?;
+                self.require_any(
+                    "Acceleration Structure",
+                    &[
+                        spirv::Capability::RayQueryKHR,
+                        spirv::Capability::RayTracingKHR,
+                    ],
+                )?;
             }
             crate::TypeInner::RayQuery { .. } => {
                 self.require_any("Ray Query", &[spirv::Capability::RayQueryKHR])?;
@@ -2023,7 +2029,15 @@ impl Writer {
                         )?;
                         BuiltIn::CullDistance
                     }
-                    Bi::InstanceIndex => BuiltIn::InstanceIndex,
+                    Bi::InstanceIndex => {
+                        if let crate::ShaderStage::RayClosestHit | crate::ShaderStage::RayAnyHit =
+                            stage
+                        {
+                            BuiltIn::InstanceId
+                        } else {
+                            BuiltIn::InstanceIndex
+                        }
+                    }
                     Bi::PointSize => BuiltIn::PointSize,
                     Bi::VertexIndex => BuiltIn::VertexIndex,
                     Bi::DrawID => BuiltIn::DrawIndex,
@@ -2088,6 +2102,133 @@ impl Writer {
                             ],
                         )?;
                         BuiltIn::SubgroupLocalInvocationId
+                    }
+                    Bi::RayLaunchId => {
+                        self.require_any(
+                            "`ray_launch_id` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::LaunchIdKHR
+                    }
+                    Bi::RayLaunchSize => {
+                        self.require_any(
+                            "`ray_launch_size` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::LaunchSizeKHR
+                    }
+                    Bi::WorldRayOrigin => {
+                        self.require_any(
+                            "`world_ray_origin` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::WorldRayOriginKHR
+                    }
+                    Bi::WorldRayDirection => {
+                        self.require_any(
+                            "`world_ray_direction` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::WorldRayDirectionKHR
+                    }
+                    Bi::ObjectRayOrigin => {
+                        self.require_any(
+                            "`object_ray_origin` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::ObjectRayOriginKHR
+                    }
+                    Bi::ObjectRayDirection => {
+                        self.require_any(
+                            "`object_ray_direction` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::ObjectRayDirectionKHR
+                    }
+                    Bi::TMin => {
+                        self.require_any(
+                            "`t_min` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::RayTminKHR
+                    }
+                    // they map to the same in spirv
+                    Bi::T | Bi::TMax => {
+                        self.require_any(
+                            "`t_min` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::RayTminKHR
+                    }
+                    Bi::ObjectToWorld => {
+                        self.require_any(
+                            "`object_to_world` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::ObjectToWorldKHR
+                    }
+                    Bi::WorldToObject => {
+                        self.require_any(
+                            "`world_to_object` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::WorldToObjectKHR
+                    }
+                    Bi::InstanceCustomData => {
+                        self.require_any(
+                            "`instance_custom_data` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::InstanceCustomIndexKHR
+                    }
+                    Bi::HitKind => {
+                        self.require_any(
+                            "`hit_kind` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::HitKindKHR
+                    }
+                    Bi::IncomingFlags => {
+                        self.require_any(
+                            "`incoming_flags` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::IncomingRayFlagsKHR
+                    }
+                    Bi::GeometryIndex => {
+                        self.require_any(
+                            "`geometry_index` built-in",
+                            &[
+                                spirv::Capability::RayTracingKHR
+                            ],
+                        )?;
+                        BuiltIn::RayGeometryIndexKHR
                     }
                 };
 
@@ -2394,8 +2535,7 @@ impl Writer {
 
         for (_, &crate::Type { ref inner, .. }) in ir_module.types.iter() {
             // spirv does not know whether these have vertex return - that is done by us
-            if let &crate::TypeInner::RayQuery { .. } = inner
-            {
+            if let &crate::TypeInner::RayQuery { .. } = inner {
                 has_ray_query = true
             }
             if let &crate::TypeInner::AccelerationStructure { .. } = inner {
@@ -2416,8 +2556,13 @@ impl Writer {
         }
 
         // If we don't have the capability, we probably shouldn't use the extension for it.
-        let ray_query_possible = self.capabilities_available.as_ref().map_or(true, |caps| caps.contains(&spirv::Capability::RayQueryKHR));
-        let ray_tracing_possible = self.capabilities_available.as_ref().map_or(true, |caps| caps.contains(&spirv::Capability::RayTracingKHR));
+        let ray_query_possible = self
+            .capabilities_available
+            .as_ref()
+            .map_or(true, |caps| caps.contains(&spirv::Capability::RayQueryKHR));
+        let ray_tracing_possible = self.capabilities_available.as_ref().map_or(true, |caps| {
+            caps.contains(&spirv::Capability::RayTracingKHR)
+        });
 
         has_ray_query |= ray_query_possible && has_ray_tracing_or_ray_query;
         has_ray_tracing_pipeline |= ray_tracing_possible && has_ray_tracing_or_ray_query;

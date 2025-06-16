@@ -648,9 +648,24 @@ impl ResolvedBinding {
                     Bi::SubgroupId => "simdgroup_index_in_threadgroup",
                     Bi::SubgroupSize => "threads_per_simdgroup",
                     Bi::SubgroupInvocationId => "thread_index_in_simdgroup",
-                    Bi::CullDistance | Bi::ViewIndex | Bi::DrawID => {
-                        return Err(Error::UnsupportedBuiltIn(built_in))
-                    }
+                    Bi::CullDistance
+                    | Bi::ViewIndex
+                    | Bi::DrawID
+                    | Bi::RayLaunchId
+                    | Bi::RayLaunchSize
+                    | Bi::WorldRayOrigin
+                    | Bi::WorldRayDirection
+                    | Bi::TMin
+                    | Bi::TMax
+                    | Bi::ObjectRayOrigin
+                    | Bi::ObjectRayDirection
+                    | Bi::ObjectToWorld
+                    | Bi::WorldToObject
+                    | Bi::InstanceCustomData
+                    | Bi::T
+                    | Bi::HitKind
+                    | Bi::IncomingFlags
+                    | Bi::GeometryIndex => return Err(Error::UnsupportedBuiltIn(built_in)),
                 };
                 write!(out, "{name}")?;
             }

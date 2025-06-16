@@ -1655,16 +1655,16 @@ impl super::Validator {
                             return Err(FunctionError::InvalidRayDescriptor(descriptor)
                                 .with_span_static(span, "invalid ray descriptor"));
                         }
-                        match *context.resolve_type_inner(
-                            payload,
-                            &self.valid_expression_set,
-                        )? {
-                            Ti::Pointer { space: AddressSpace::RayPayload | AddressSpace::IncomingRayPayload, .. } => {}
+                        match *context.resolve_type_inner(payload, &self.valid_expression_set)? {
+                            Ti::Pointer {
+                                space: AddressSpace::RayPayload | AddressSpace::IncomingRayPayload,
+                                ..
+                            } => {}
                             _ => {
                                 return Err(FunctionError::InvalidAccelerationStructure(
                                     acceleration_structure,
                                 )
-                                    .with_span_static(span, "invalid acceleration structure"))
+                                .with_span_static(span, "invalid acceleration structure"))
                             }
                         }
                     }

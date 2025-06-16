@@ -188,7 +188,22 @@ impl TryToWgsl for crate::BuiltIn {
             | Bi::PointSize
             | Bi::DrawID
             | Bi::PointCoord
-            | Bi::WorkGroupSize => return None,
+            | Bi::WorkGroupSize
+            | Bi::RayLaunchId
+            | Bi::RayLaunchSize
+            | Bi::WorldRayOrigin
+            | Bi::WorldRayDirection
+            | Bi::TMin
+            | Bi::TMax
+            | Bi::T
+            | Bi::ObjectRayOrigin
+            | Bi::ObjectRayDirection
+            | Bi::ObjectToWorld
+            | Bi::WorldToObject
+            | Bi::InstanceCustomData
+            | Bi::HitKind
+            | Bi::IncomingFlags
+            | Bi::GeometryIndex=> return None,
         })
     }
 }
