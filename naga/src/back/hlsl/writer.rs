@@ -2677,8 +2677,7 @@ impl<'a, W: fmt::Write> super::Writer<'a, W> {
                 }
                 writeln!(self.out, ");")?;
             }
-            Statement::DiscardHit | Statement::AcceptHitEndSearch |
-            Statement::RayTracing(_) => {
+            Statement::DiscardHit | Statement::AcceptHitEndSearch | Statement::RayTracing(_) => {
                 return Err(Error::Unimplemented("Ray tracing pipelines".to_string()))
             }
         }

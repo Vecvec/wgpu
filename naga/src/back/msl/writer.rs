@@ -579,7 +579,8 @@ impl crate::AddressSpace {
             | Self::PushConstant
             | Self::Handle => true,
             Self::Function => false,
-            Self::RayPayload | Self::IncomingRayPayload => todo!(),
+            // unimplemented
+            Self::RayPayload | Self::IncomingRayPayload => false,
         }
     }
 
@@ -4163,8 +4164,9 @@ impl<W: Write> Writer<W> {
                     }
                     writeln!(self.out, ");")?;
                 }
-                crate::Statement::DiscardHit | crate::Statement::AcceptHitEndSearch |
-                crate::Statement::RayTracing(_) => {
+                crate::Statement::DiscardHit
+                | crate::Statement::AcceptHitEndSearch
+                | crate::Statement::RayTracing(_) => {
                     return Err(Error::FeatureNotImplemented(
                         "Ray tracing pipelines".to_string(),
                     ))

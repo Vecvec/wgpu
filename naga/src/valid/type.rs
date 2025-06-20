@@ -104,6 +104,8 @@ pub enum Disalignment {
 pub enum TypeError {
     #[error("Capability {0:?} is required")]
     MissingCapability(Capabilities),
+    #[error("One of {0:?} is required")]
+    MissingAnyCapability(Capabilities),
     #[error("The {0:?} scalar width {1} is not supported for an atomic")]
     InvalidAtomicWidth(crate::ScalarKind, crate::Bytes),
     #[error("Invalid type for pointer target {0:?}")]
@@ -262,6 +264,14 @@ impl super::Validator {
             Ok(())
         } else {
             Err(TypeError::MissingCapability(capability))
+        }
+    }
+
+    const fn require_any_type_capability(&self, capability: Capabilities) -> Result<(), TypeError> {
+        if self.capabilities.intersects(capability) {
+            Ok(())
+        } else {
+            Err(TypeError::MissingAnyCapability(capability))
         }
     }
 
@@ -746,7 +756,7 @@ impl super::Validator {
                 Alignment::ONE,
             ),
             Ti::AccelerationStructure { vertex_return } => {
-                self.require_type_capability(Capabilities::RAY_QUERY)?;
+                self.require_any_type_capability(Capabilities::RAY_QUERY | Capabilities::RAY_TRACING_PIPELINE)?;
                 if vertex_return {
                     self.require_type_capability(Capabilities::RAY_HIT_VERTEX_POSITION)?;
                 }

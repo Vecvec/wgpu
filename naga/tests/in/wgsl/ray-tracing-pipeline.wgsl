@@ -11,7 +11,7 @@ var<ray_payload> unused_payload: Payload;
 @payload_type(Payload)
 fn ray_gen_with_unused_payload_type(
     @builtin(ray_launch_size) launch_size: vec3<u32>,
-     @builtin(ray_launch_id) launch_id: vec3<u32>,
+    @builtin(ray_launch_id) launch_id: vec3<u32>,
 ) {}
 
 @ray_generation

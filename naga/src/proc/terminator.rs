@@ -28,7 +28,14 @@ pub fn ensure_block_returns(block: &mut crate::Block) {
                 }
             }
         }
-        Some(&mut (S::Break | S::Continue | S::Return { .. } | S::Kill | S::DiscardHit | S::AcceptHitEndSearch)) => (),
+        Some(
+            &mut (S::Break
+            | S::Continue
+            | S::Return { .. }
+            | S::Kill
+            | S::DiscardHit
+            | S::AcceptHitEndSearch),
+        ) => (),
         Some(
             &mut (S::Emit(_)
             | S::Loop { .. }

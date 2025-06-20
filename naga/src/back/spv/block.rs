@@ -3243,7 +3243,8 @@ impl BlockContext<'_> {
                     return Ok(BlockExitDisposition::Discarded);
                 }
                 Statement::DiscardHit => {
-                    self.function.consume(block, Instruction::ignore_intersection());
+                    self.function
+                        .consume(block, Instruction::ignore_intersection());
                     return Ok(BlockExitDisposition::Discarded);
                 }
                 Statement::AcceptHitEndSearch => {

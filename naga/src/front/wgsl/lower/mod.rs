@@ -1535,7 +1535,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                     .globals
                     .get(incoming_payload)
                     .ok_or(Error::UnknownIdent(span, incoming_payload))?;
-                let LoweredGlobalDecl::Var(global_payload_handle) = lowered_global else {
+                let LoweredGlobalDecl::Var(ref global_payload_handle) = *lowered_global else {
                     return Err(Box::new(Error::Unexpected(span, ExpectedToken::Variable)));
                 };
                 incoming_payload_handle = Some(*global_payload_handle)

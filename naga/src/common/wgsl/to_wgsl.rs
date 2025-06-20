@@ -203,7 +203,7 @@ impl TryToWgsl for crate::BuiltIn {
             | Bi::InstanceCustomData
             | Bi::HitKind
             | Bi::IncomingFlags
-            | Bi::GeometryIndex=> return None,
+            | Bi::GeometryIndex => return None,
         })
     }
 }

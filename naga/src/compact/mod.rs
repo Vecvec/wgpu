@@ -345,10 +345,10 @@ pub fn compact(module: &mut crate::Module, keep_unused: KeepUnused) {
     // Compact each entry point.
     for (entry, map) in module.entry_points.iter_mut().zip(entry_point_maps.iter()) {
         log::trace!("compacting entry point {:?}", entry.function.name);
-        if let Some(payload_ty) = &mut entry.payload_type_handle {
+        if let Some(ref mut payload_ty) = entry.payload_type_handle {
             module_map.types.adjust(payload_ty);
         }
-        if let Some(incoming_payload) = &mut entry.incoming_payload_handle {
+        if let Some(ref mut incoming_payload) = entry.incoming_payload_handle {
             module_map.globals.adjust(incoming_payload);
         }
         map.compact(

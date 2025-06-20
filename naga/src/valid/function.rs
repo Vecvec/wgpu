@@ -1627,11 +1627,14 @@ impl super::Validator {
                 S::DiscardHit | S::AcceptHitEndSearch => {
                     stages &= super::ShaderStages::RAY_ANY_HIT;
 
-                    if !self.capabilities.contains(super::Capabilities::RAY_TRACING_PIPELINE) {
+                    if !self
+                        .capabilities
+                        .contains(super::Capabilities::RAY_TRACING_PIPELINE)
+                    {
                         return Err(FunctionError::MissingCapability(
                             super::Capabilities::RAY_TRACING_PIPELINE,
                         )
-                            .with_span_static(span, "missing capability for this operation"));
+                        .with_span_static(span, "missing capability for this operation"));
                     }
                 }
                 S::RayTracing(ref fun) => match *fun {
@@ -1644,11 +1647,14 @@ impl super::Validator {
                             | super::ShaderStages::RAY_CLOSEST_HIT
                             | super::ShaderStages::RAY_MISS;
 
-                        if !self.capabilities.contains(super::Capabilities::RAY_TRACING_PIPELINE) {
+                        if !self
+                            .capabilities
+                            .contains(super::Capabilities::RAY_TRACING_PIPELINE)
+                        {
                             return Err(FunctionError::MissingCapability(
                                 super::Capabilities::RAY_TRACING_PIPELINE,
                             )
-                                .with_span_static(span, "missing capability for this operation"));
+                            .with_span_static(span, "missing capability for this operation"));
                         }
 
                         match *context.resolve_type_inner(

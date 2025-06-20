@@ -343,64 +343,129 @@ impl VaryingContext<'_> {
                     ),
                     Bi::RayLaunchId | Bi::RayLaunchSize => (
                         match self.stage {
-                            St::RayGeneration | St::RayClosestHit | St::RayAnyHit | St::RayMiss => !self.output,
+                            St::RayGeneration | St::RayClosestHit | St::RayAnyHit | St::RayMiss => {
+                                !self.output
+                            }
                             St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
                         },
-                        *ty_inner == Ti::Vector { scalar:crate::Scalar::U32, size: crate::VectorSize::Tri },
+                        *ty_inner
+                            == Ti::Vector {
+                                scalar: crate::Scalar::U32,
+                                size: crate::VectorSize::Tri,
+                            },
                     ),
                     Bi::WorldRayOrigin | Bi::WorldRayDirection => (
                         match self.stage {
                             St::RayClosestHit | St::RayAnyHit | St::RayMiss => !self.output,
-                            St::RayGeneration | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                            St::RayGeneration
+                            | St::Vertex
+                            | St::Fragment
+                            | St::Compute
+                            | St::Task
+                            | St::Mesh => false,
                         },
-                        *ty_inner == Ti::Vector { scalar:crate::Scalar::F32, size: crate::VectorSize::Tri },
+                        *ty_inner
+                            == Ti::Vector {
+                                scalar: crate::Scalar::F32,
+                                size: crate::VectorSize::Tri,
+                            },
                     ),
                     Bi::ObjectRayOrigin | Bi::ObjectRayDirection => (
                         match self.stage {
                             St::RayClosestHit | St::RayAnyHit => !self.output,
-                            St::RayGeneration | St::RayMiss | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                            St::RayGeneration
+                            | St::RayMiss
+                            | St::Vertex
+                            | St::Fragment
+                            | St::Compute
+                            | St::Task
+                            | St::Mesh => false,
                         },
-                        *ty_inner == Ti::Vector { scalar:crate::Scalar::F32, size: crate::VectorSize::Tri },
+                        *ty_inner
+                            == Ti::Vector {
+                                scalar: crate::Scalar::F32,
+                                size: crate::VectorSize::Tri,
+                            },
                     ),
                     Bi::TMin => (
                         match self.stage {
                             St::RayClosestHit | St::RayAnyHit | St::RayMiss => !self.output,
-                            St::RayGeneration | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                            St::RayGeneration
+                            | St::Vertex
+                            | St::Fragment
+                            | St::Compute
+                            | St::Task
+                            | St::Mesh => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::F32),
                     ),
                     Bi::TMax => (
                         match self.stage {
                             St::RayMiss => !self.output,
-                            St::RayGeneration | St::RayClosestHit | St::RayAnyHit | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                            St::RayGeneration
+                            | St::RayClosestHit
+                            | St::RayAnyHit
+                            | St::Vertex
+                            | St::Fragment
+                            | St::Compute
+                            | St::Task
+                            | St::Mesh => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::F32),
                     ),
                     Bi::T => (
                         match self.stage {
                             St::RayClosestHit | St::RayAnyHit => !self.output,
-                            St::RayGeneration | St::RayMiss | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                            St::RayGeneration
+                            | St::RayMiss
+                            | St::Vertex
+                            | St::Fragment
+                            | St::Compute
+                            | St::Task
+                            | St::Mesh => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::F32),
                     ),
                     Bi::ObjectToWorld | Bi::WorldToObject => (
                         match self.stage {
                             St::RayClosestHit | St::RayAnyHit => !self.output,
-                            St::RayGeneration | St::RayMiss | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                            St::RayGeneration
+                            | St::RayMiss
+                            | St::Vertex
+                            | St::Fragment
+                            | St::Compute
+                            | St::Task
+                            | St::Mesh => false,
                         },
-                        *ty_inner == Ti::Matrix { scalar: crate::Scalar::F32, rows: crate::VectorSize::Tri, columns: crate::VectorSize::Quad },
+                        *ty_inner
+                            == Ti::Matrix {
+                                scalar: crate::Scalar::F32,
+                                rows: crate::VectorSize::Tri,
+                                columns: crate::VectorSize::Quad,
+                            },
                     ),
                     Bi::IncomingFlags => (
                         match self.stage {
                             St::RayClosestHit | St::RayAnyHit | St::RayMiss => !self.output,
-                            St::RayGeneration | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                            St::RayGeneration
+                            | St::Vertex
+                            | St::Fragment
+                            | St::Compute
+                            | St::Task
+                            | St::Mesh => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
                     Bi::InstanceCustomData | Bi::HitKind | Bi::GeometryIndex => (
                         match self.stage {
                             St::RayClosestHit | St::RayAnyHit => !self.output,
-                            St::RayGeneration | St::RayMiss | St::Vertex | St::Fragment | St::Compute | St::Task | St::Mesh => false,
+                            St::RayGeneration
+                            | St::RayMiss
+                            | St::Vertex
+                            | St::Fragment
+                            | St::Compute
+                            | St::Task
+                            | St::Mesh => false,
                         },
                         *ty_inner == Ti::Scalar(crate::Scalar::U32),
                     ),
