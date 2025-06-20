@@ -3,10 +3,11 @@ use alloc::{borrow::ToOwned as _, boxed::Box, vec::Vec};
 use crate::{
     AccelerationStructureBuildSizes, AccelerationStructureDescriptor, Api, BindGroupDescriptor,
     BindGroupLayoutDescriptor, BufferDescriptor, BufferMapping, CommandEncoderDescriptor,
-    ComputePipelineDescriptor, Device, DeviceError, FenceValue,
+    ComputePipelineDescriptor, Device, DeviceError, DynRayTracingPipeline, FenceValue,
     GetAccelerationStructureBuildSizesDescriptor, Label, MemoryRange, MeshPipelineDescriptor,
     PipelineCacheDescriptor, PipelineCacheError, PipelineError, PipelineLayoutDescriptor,
-    RenderPipelineDescriptor, SamplerDescriptor, ShaderError, ShaderInput, ShaderModuleDescriptor,
+    RayTracingIntersectionGroup, RayTracingPipelineDescriptor, RenderPipelineDescriptor,
+    SamplerDescriptor, ShaderBindingData, ShaderError, ShaderInput, ShaderModuleDescriptor,
     TextureDescriptor, TextureViewDescriptor, TlasInstance,
 };
 
@@ -119,6 +120,21 @@ pub trait DynDevice: DynResource {
         >,
     ) -> Result<Box<dyn DynComputePipeline>, PipelineError>;
     unsafe fn destroy_compute_pipeline(&self, pipeline: Box<dyn DynComputePipeline>);
+
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &RayTracingPipelineDescriptor<
+            dyn DynPipelineLayout,
+            dyn DynShaderModule,
+            dyn DynPipelineCache,
+        >,
+    ) -> Result<Box<dyn DynRayTracingPipeline>, PipelineError>;
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: Box<dyn DynRayTracingPipeline>);
+
+    unsafe fn get_shader_binding_data(
+        &self,
+        pipeline: &dyn DynRayTracingPipeline,
+    ) -> Result<ShaderBindingData, DeviceError>;
 
     unsafe fn create_pipeline_cache(
         &self,
@@ -454,6 +470,49 @@ impl<D: Device + DynResource> DynDevice for D {
 
     unsafe fn destroy_compute_pipeline(&self, pipeline: Box<dyn DynComputePipeline>) {
         unsafe { D::destroy_compute_pipeline(self, pipeline.unbox()) };
+    }
+
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &RayTracingPipelineDescriptor<
+            dyn DynPipelineLayout,
+            dyn DynShaderModule,
+            dyn DynPipelineCache,
+        >,
+    ) -> Result<Box<dyn DynRayTracingPipeline>, PipelineError> {
+        let desc = RayTracingPipelineDescriptor {
+            label: desc.label,
+            layout: desc.layout.expect_downcast_ref(),
+            ray_generation_stage: desc.ray_generation_stage.clone().expect_downcast(),
+            ray_miss_stage: desc.ray_miss_stage.clone().expect_downcast(),
+            intersection_groups: desc
+                .intersection_groups
+                .iter()
+                .map(|group| RayTracingIntersectionGroup {
+                    ray_closest_hit: group.ray_closest_hit.clone().expect_downcast(),
+                    ray_any_hit: group
+                        .ray_any_hit
+                        .clone()
+                        .map(|any_hit| any_hit.expect_downcast()),
+                })
+                .collect(),
+            max_recursion_depth: desc.max_recursion_depth,
+            cache: desc.cache.as_ref().map(|c| c.expect_downcast_ref()),
+        };
+
+        unsafe { D::create_ray_tracing_pipeline(self, &desc) }
+            .map(|b| -> Box<dyn DynRayTracingPipeline> { Box::new(b) })
+    }
+
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: Box<dyn DynRayTracingPipeline>) {
+        unsafe { D::destroy_ray_tracing_pipeline(self, pipeline.unbox()) };
+    }
+
+    unsafe fn get_shader_binding_data(
+        &self,
+        pipeline: &dyn DynRayTracingPipeline,
+    ) -> Result<ShaderBindingData, DeviceError> {
+        unsafe { D::get_shader_binding_data(self, pipeline.expect_downcast_ref()) }
     }
 
     unsafe fn create_pipeline_cache(

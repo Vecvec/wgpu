@@ -545,6 +545,10 @@ pub fn map_buffer_usage(usage: wgt::BufferUses) -> vk::BufferUsageFlags {
     if usage.intersects(wgt::BufferUses::ACCELERATION_STRUCTURE_QUERY) {
         flags |= vk::BufferUsageFlags::TRANSFER_DST;
     }
+    if usage.contains(wgt::BufferUses::SHADER_BINDING_DATA) {
+        flags |= vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
+            | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS;
+    }
     flags
 }
 
@@ -738,6 +742,18 @@ pub fn map_shader_stage(stage: wgt::ShaderStages) -> vk::ShaderStageFlags {
     }
     if stage.contains(wgt::ShaderStages::COMPUTE) {
         flags |= vk::ShaderStageFlags::COMPUTE;
+    }
+    if stage.contains(wgt::ShaderStages::RAY_GENERATION) {
+        flags |= vk::ShaderStageFlags::RAYGEN_KHR
+    }
+    if stage.contains(wgt::ShaderStages::RAY_CLOSEST_HIT) {
+        flags |= vk::ShaderStageFlags::CLOSEST_HIT_KHR
+    }
+    if stage.contains(wgt::ShaderStages::RAY_ANY_HIT) {
+        flags |= vk::ShaderStageFlags::ANY_HIT_KHR
+    }
+    if stage.contains(wgt::ShaderStages::RAY_MISS) {
+        flags |= vk::ShaderStageFlags::MISS_KHR
     }
     flags
 }

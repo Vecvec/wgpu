@@ -489,6 +489,10 @@ pub fn create_validator(
         Caps::RAY_HIT_VERTEX_POSITION,
         features.intersects(wgt::Features::EXPERIMENTAL_RAY_HIT_VERTEX_RETURN),
     );
+    caps.set(
+        Caps::RAY_TRACING_PIPELINE,
+        features.intersects(wgt::Features::EXPERIMENTAL_RAY_TRACING_PIPELINES),
+    );
 
     naga::valid::Validator::new(flags, caps)
 }

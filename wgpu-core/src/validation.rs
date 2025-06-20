@@ -1032,6 +1032,10 @@ impl Interface {
             wgt::ShaderStages::VERTEX => naga::ShaderStage::Vertex,
             wgt::ShaderStages::FRAGMENT => naga::ShaderStage::Fragment,
             wgt::ShaderStages::COMPUTE => naga::ShaderStage::Compute,
+            wgt::ShaderStages::RAY_GENERATION => naga::ShaderStage::RayGeneration,
+            wgt::ShaderStages::RAY_CLOSEST_HIT => naga::ShaderStage::RayClosestHit,
+            wgt::ShaderStages::RAY_ANY_HIT => naga::ShaderStage::RayAnyHit,
+            wgt::ShaderStages::RAY_MISS => naga::ShaderStage::RayMiss,
             _ => unreachable!(),
         }
     }

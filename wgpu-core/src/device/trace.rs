@@ -101,6 +101,13 @@ pub enum Action<'a> {
         implicit_context: Option<super::ImplicitPipelineContext>,
     },
     DestroyRenderPipeline(id::RenderPipelineId),
+    CreateRayTracingPipeline {
+        id: id::RayTracingPipelineId,
+        desc: crate::pipeline::RayTracingPipelineDescriptor<'a>,
+        #[cfg_attr(feature = "replay", serde(default))]
+        implicit_context: Option<super::ImplicitPipelineContext>,
+    },
+    DestroyRayTracingPipeline(id::RayTracingPipelineId),
     CreatePipelineCache {
         id: id::PipelineCacheId,
         desc: crate::pipeline::PipelineCacheDescriptor<'a>,

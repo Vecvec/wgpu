@@ -81,6 +81,7 @@ impl crate::Api for Api {
     type ShaderModule = ShaderModule;
     type RenderPipeline = RenderPipeline;
     type ComputePipeline = ComputePipeline;
+    type RayTracingPipeline = RayTracingPipeline;
 }
 
 crate::impl_dyn_resource!(
@@ -100,6 +101,7 @@ crate::impl_dyn_resource!(
     QuerySet,
     Queue,
     RenderPipeline,
+    RayTracingPipeline,
     Sampler,
     ShaderModule,
     Surface,
@@ -480,6 +482,7 @@ struct DeviceExtensionFunctions {
     timeline_semaphore: Option<ExtensionFn<khr::timeline_semaphore::Device>>,
     ray_tracing: Option<RayTracingDeviceExtensionFunctions>,
     mesh_shading: Option<ext::mesh_shader::Device>,
+    ray_tracing_pipeline: Option<khr::ray_tracing_pipeline::Device>,
 }
 
 struct RayTracingDeviceExtensionFunctions {
@@ -556,6 +559,10 @@ struct PrivateCapabilities {
     /// [`VK_KHR_shader_float16_int8`]: https://registry.khronos.org/vulkan/specs/latest/man/html/VK_KHR_shader_float16_int8.html
     /// [see spec]: https://registry.khronos.org/vulkan/specs/latest/man/html/VkPhysicalDeviceShaderFloat16Int8Features.html#extension-features-shaderInt8
     shader_int8: bool,
+
+    /// The size of a ray tracing shader group (one ray generation shader, or miss shader, or closest
+    /// hit and any hit shaders). If ray tracing is not enabled this is 0.
+    shader_group_handle_size: u32,
 }
 
 bitflags::bitflags!(
@@ -1032,6 +1039,14 @@ pub struct ComputePipeline {
 }
 
 impl crate::DynComputePipeline for ComputePipeline {}
+
+#[derive(Debug)]
+pub struct RayTracingPipeline {
+    raw: vk::Pipeline,
+    num_groups: usize,
+}
+
+impl crate::DynRayTracingPipeline for RayTracingPipeline {}
 
 #[derive(Debug)]
 pub struct PipelineCache {

@@ -15,6 +15,7 @@ use serde::Deserialize;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use crate::pipeline::RayTracingPipeline;
 use crate::{
     device::{
         bgl, Device, DeviceError, MissingDownlevelFlags, MissingFeatures, SHADER_STAGE_COUNT,
@@ -582,6 +583,7 @@ pub(crate) enum ExclusivePipeline {
     None,
     Render(Weak<RenderPipeline>),
     Compute(Weak<ComputePipeline>),
+    RayTracing(Weak<RayTracingPipeline>),
 }
 
 impl fmt::Display for ExclusivePipeline {
@@ -600,6 +602,13 @@ impl fmt::Display for ExclusivePipeline {
                     p.error_ident().fmt(f)
                 } else {
                     f.write_str("ComputePipeline")
+                }
+            }
+            ExclusivePipeline::RayTracing(p) => {
+                if let Some(p) = p.upgrade() {
+                    p.error_ident().fmt(f)
+                } else {
+                    f.write_str("RayTracingPipeline")
                 }
             }
         }

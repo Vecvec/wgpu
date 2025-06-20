@@ -126,6 +126,17 @@ pub struct PhysicalDeviceFeatures {
     /// Features provided by `VK_KHR_shader_integer_dot_product`, promoted to Vulkan 1.3.
     shader_integer_dot_product:
         Option<vk::PhysicalDeviceShaderIntegerDotProductFeaturesKHR<'static>>,
+
+    /// Features provided by `VK_KHR_ray_tracing_pipeline`,
+    ///
+    /// Vulkan requires that the feature be present if the `VK_KHR_ray_tracing_pipeline`
+    /// extension is present, so [`Instance::expose_adapter`] doesn't bother retrieving
+    /// this from `vkGetPhysicalDeviceFeatures2`.
+    ///
+    /// However, we do populate this when creating a device if ray tracing pipelines are requested.
+    ///
+    /// [`Instance::expose_adapter`]: super::Instance::expose_adapter
+    ray_tracing_pipeline: Option<vk::PhysicalDeviceRayTracingPipelineFeaturesKHR<'static>>,
 }
 
 impl PhysicalDeviceFeatures {
@@ -193,6 +204,9 @@ impl PhysicalDeviceFeatures {
             info = info.push_next(feature);
         }
         if let Some(ref mut feature) = self.shader_integer_dot_product {
+            info = info.push_next(feature);
+        }
+        if let Some(ref mut feature) = self.ray_tracing_pipeline {
             info = info.push_next(feature);
         }
         info
@@ -524,6 +538,15 @@ impl PhysicalDeviceFeatures {
             } else {
                 None
             },
+            ray_tracing_pipeline: if enabled_extensions.contains(&khr::ray_tracing_pipeline::NAME) {
+                Some(
+                    vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::default()
+                        .ray_tracing_pipeline(true)
+                        .ray_tracing_pipeline_trace_rays_indirect(true),
+                )
+            } else {
+                None
+            },
         }
     }
 
@@ -656,6 +679,14 @@ impl PhysicalDeviceFeatures {
                 shader_atomic_float.shader_buffer_float32_atomics != 0
                     && shader_atomic_float.shader_buffer_float32_atomic_add != 0,
             );
+        }
+
+        if let Some(ref ray_tracing_pipelines) = self.ray_tracing_pipeline {
+            features.set(
+                F::EXPERIMENTAL_RAY_TRACING_PIPELINES,
+                ray_tracing_pipelines.ray_tracing_pipeline != 0
+                    && ray_tracing_pipelines.ray_tracing_pipeline_trace_rays_indirect != 0,
+            )
         }
 
         //if caps.supports_extension(khr::sampler_mirror_clamp_to_edge::NAME) {
@@ -934,6 +965,10 @@ pub struct PhysicalDeviceProperties {
     /// `VK_EXT_mesh_shader` extension.
     _mesh_shader: Option<vk::PhysicalDeviceMeshShaderPropertiesEXT<'static>>,
 
+    /// Additional `vk::PhysicalDevice` properties from the
+    /// `VK_KHR_ray_tracing_pipeline` extension.
+    ray_tracing_pipeline: Option<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR<'static>>,
+
     /// The device API version.
     ///
     /// Which is the version of Vulkan supported for device-level functionality.
@@ -1114,6 +1149,10 @@ impl PhysicalDeviceProperties {
 
         if requested_features.contains(wgt::Features::EXPERIMENTAL_RAY_HIT_VERTEX_RETURN) {
             extensions.push(khr::ray_tracing_position_fetch::NAME)
+        }
+
+        if requested_features.contains(wgt::Features::EXPERIMENTAL_RAY_TRACING_PIPELINES) {
+            extensions.push(khr::ray_tracing_pipeline::NAME)
         }
 
         // Require `VK_EXT_conservative_rasterization` if the associated feature was requested
@@ -1339,6 +1378,9 @@ impl super::InstanceShared {
 
                 let supports_mesh_shader = capabilities.supports_extension(ext::mesh_shader::NAME);
 
+                let supports_ray_tracing_pipeline =
+                    capabilities.supports_extension(khr::ray_tracing_pipeline::NAME);
+
                 let mut properties2 = vk::PhysicalDeviceProperties2KHR::default();
                 if supports_maintenance3 {
                     let next = capabilities
@@ -1393,6 +1435,13 @@ impl super::InstanceShared {
                     let next = capabilities
                         ._mesh_shader
                         .insert(vk::PhysicalDeviceMeshShaderPropertiesEXT::default());
+                    properties2 = properties2.push_next(next);
+                }
+
+                if supports_ray_tracing_pipeline {
+                    let next = capabilities
+                        .ray_tracing_pipeline
+                        .insert(vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default());
                     properties2 = properties2.push_next(next);
                 }
 
@@ -1561,6 +1610,13 @@ impl super::InstanceShared {
                 let next = features
                     .shader_integer_dot_product
                     .insert(vk::PhysicalDeviceShaderIntegerDotProductFeatures::default());
+                features2 = features2.push_next(next);
+            }
+
+            if capabilities.supports_extension(khr::ray_tracing_pipeline::NAME) {
+                let next = features
+                    .ray_tracing_pipeline
+                    .insert(vk::PhysicalDeviceRayTracingPipelineFeaturesKHR::default());
                 features2 = features2.push_next(next);
             }
 
@@ -1753,6 +1809,9 @@ impl super::Instance {
             shader_int8: phd_features
                 .shader_float16_int8
                 .is_some_and(|features| features.shader_int8 != 0),
+            shader_group_handle_size: phd_capabilities
+                .ray_tracing_pipeline
+                .map_or(0, |properties| properties.shader_group_handle_size),
         };
         let capabilities = crate::Capabilities {
             limits: phd_capabilities.to_wgpu_limits(),
@@ -1938,6 +1997,16 @@ impl super::Adapter {
             None
         };
 
+        let ray_tracing_pipeline_fns =
+            if enabled_extensions.contains(&khr::ray_tracing_pipeline::NAME) {
+                Some(khr::ray_tracing_pipeline::Device::new(
+                    &self.instance.raw,
+                    &raw_device,
+                ))
+            } else {
+                None
+            };
+
         let naga_options = {
             use naga::back::spv;
 
@@ -1998,6 +2067,10 @@ impl super::Adapter {
 
             if features.contains(wgt::Features::EXPERIMENTAL_RAY_QUERY) {
                 capabilities.push(spv::Capability::RayQueryKHR);
+            }
+
+            if features.contains(wgt::Features::EXPERIMENTAL_RAY_TRACING_PIPELINES) {
+                capabilities.push(spv::Capability::RayTracingKHR);
             }
 
             if features.contains(wgt::Features::SHADER_INT64) {
@@ -2140,6 +2213,7 @@ impl super::Adapter {
                 timeline_semaphore: timeline_semaphore_fn,
                 ray_tracing: ray_tracing_fns,
                 mesh_shading: mesh_shading_fns,
+                ray_tracing_pipeline: ray_tracing_pipeline_fns,
             },
             pipeline_cache_validation_key,
             vendor_id: self.phd_capabilities.properties.vendor_id,

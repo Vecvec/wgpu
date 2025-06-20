@@ -423,6 +423,27 @@ impl GlobalPlay for wgc::global::Global {
             Action::DestroyTlas(id) => {
                 self.tlas_drop(id);
             }
+            Action::CreateRayTracingPipeline {
+                id,
+                desc,
+                implicit_context,
+            } => {
+                let implicit_ids =
+                    implicit_context
+                        .as_ref()
+                        .map(|ic| wgc::device::ImplicitPipelineIds {
+                            root_id: ic.root_id,
+                            group_ids: &ic.group_ids,
+                        });
+                let (_, error) =
+                    self.device_create_ray_tracing_pipeline(device, &desc, Some(id), implicit_ids);
+                if let Some(e) = error {
+                    panic!("{e}");
+                }
+            }
+            Action::DestroyRayTracingPipeline(id) => {
+                self.ray_tracing_pipeline_drop(id);
+            }
         }
     }
 }

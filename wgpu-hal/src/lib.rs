@@ -286,8 +286,9 @@ pub use dynamic::{
     DynAccelerationStructure, DynAcquiredSurfaceTexture, DynAdapter, DynBindGroup,
     DynBindGroupLayout, DynBuffer, DynCommandBuffer, DynCommandEncoder, DynComputePipeline,
     DynDevice, DynExposedAdapter, DynFence, DynInstance, DynOpenDevice, DynPipelineCache,
-    DynPipelineLayout, DynQuerySet, DynQueue, DynRenderPipeline, DynResource, DynSampler,
-    DynShaderModule, DynSurface, DynSurfaceTexture, DynTexture, DynTextureView,
+    DynPipelineLayout, DynQuerySet, DynQueue, DynRayTracingPipeline, DynRenderPipeline,
+    DynResource, DynSampler, DynShaderModule, DynSurface, DynSurfaceTexture, DynTexture,
+    DynTextureView,
 };
 
 #[allow(unused)]
@@ -508,6 +509,7 @@ pub trait Api: Clone + fmt::Debug + Sized {
     type ShaderModule: DynShaderModule;
     type RenderPipeline: DynRenderPipeline;
     type ComputePipeline: DynComputePipeline;
+    type RayTracingPipeline: DynRayTracingPipeline;
     type PipelineCache: DynPipelineCache;
 
     type AccelerationStructure: DynAccelerationStructure + 'static;
@@ -926,6 +928,21 @@ pub trait Device: WasmNotSendSync {
         >,
     ) -> Result<<Self::A as Api>::ComputePipeline, PipelineError>;
     unsafe fn destroy_compute_pipeline(&self, pipeline: <Self::A as Api>::ComputePipeline);
+
+    #[allow(clippy::type_complexity)]
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &RayTracingPipelineDescriptor<
+            <Self::A as Api>::PipelineLayout,
+            <Self::A as Api>::ShaderModule,
+            <Self::A as Api>::PipelineCache,
+        >,
+    ) -> Result<<Self::A as Api>::RayTracingPipeline, PipelineError>;
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: <Self::A as Api>::RayTracingPipeline);
+    unsafe fn get_shader_binding_data(
+        &self,
+        pipeline: &<Self::A as Api>::RayTracingPipeline,
+    ) -> Result<ShaderBindingData, DeviceError>;
 
     unsafe fn create_pipeline_cache(
         &self,
@@ -2166,6 +2183,55 @@ pub struct ComputePipelineDescriptor<
     pub stage: ProgrammableStage<'a, M>,
     /// The cache which will be used and filled when compiling this pipeline
     pub cache: Option<&'a Pc>,
+}
+
+/// Describes a ray tracing pipeline.
+#[derive(Clone, Debug)]
+pub struct RayTracingPipelineDescriptor<
+    'a,
+    Pl: DynPipelineLayout + ?Sized,
+    M: DynShaderModule + ?Sized,
+    Pc: DynPipelineCache + ?Sized,
+> {
+    pub label: Label<'a>,
+    /// The layout of bind groups for this pipeline.
+    pub layout: &'a Pl,
+    /// The compiled ray generation stage and its entry point.
+    pub ray_generation_stage: ProgrammableStage<'a, M>,
+    /// The compiled ray mis stage and its entry point.
+    pub ray_miss_stage: ProgrammableStage<'a, M>,
+    /// The group of compiled intersection shaders and their entry points.
+    pub intersection_groups: Vec<RayTracingIntersectionGroup<'a, M>>,
+    /// The maximum recursion depth of the ray
+    pub max_recursion_depth: u32,
+    /// The cache which will be used and filled when compiling this pipeline
+    pub cache: Option<&'a Pc>,
+}
+
+/// Describes an intersection group inside a ray tracing pipeline
+#[derive(Clone, Debug)]
+pub struct RayTracingIntersectionGroup<'a, M: DynShaderModule + ?Sized> {
+    /// The compiled closest hit shader stage and its entry point.
+    pub ray_closest_hit: ProgrammableStage<'a, M>,
+    /// The optional compiled any hit shader stage and its entry point.
+    pub ray_any_hit: Option<ProgrammableStage<'a, M>>,
+}
+
+pub struct ShaderBindingData {
+    /// The offset into the data for the ray gen shader binding
+    pub ray_generation_offset: wgt::BufferAddress,
+    /// The size of the data for the ray gen shader binding
+    pub ray_generation_size: wgt::BufferSize,
+    /// The offset into the data for the ray gen shader binding
+    pub ray_miss_offset: wgt::BufferAddress,
+    /// The size of the data for the ray gen shader binding
+    pub ray_miss_size: wgt::BufferSize,
+    /// The offset into the data for the ray gen shader binding
+    pub ray_hit_offset: wgt::BufferAddress,
+    /// The size of the data for the ray gen shader binding
+    pub ray_hit_size: wgt::BufferSize,
+    /// The data of the shader binding
+    pub data: Vec<u8>,
 }
 
 pub struct PipelineCacheDescriptor<'a> {

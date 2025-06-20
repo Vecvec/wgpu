@@ -14,6 +14,7 @@ use wgpu_test::TestingContext;
 mod as_build;
 mod as_create;
 mod as_use_after_free;
+mod ray_tracing_pipeline;
 mod scene;
 mod shader;
 

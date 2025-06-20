@@ -1300,6 +1300,11 @@ pub struct WebComputePipeline {
 }
 
 #[derive(Debug)]
+pub struct WebRayTracingPipeline {
+    ident: crate::cmp::Identifier,
+}
+
+#[derive(Debug)]
 pub struct WebPipelineCache {
     /// Unique identifier for this PipelineCache.
     ident: crate::cmp::Identifier,

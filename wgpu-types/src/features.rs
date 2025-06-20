@@ -1244,6 +1244,13 @@ bitflags_array! {
         ///
         /// [BlasTriangleGeometrySizeDescriptor::vertex_format]: super::BlasTriangleGeometrySizeDescriptor
         const EXTENDED_ACCELERATION_STRUCTURE_VERTEX_FORMATS = 1 << 51;
+
+        /// Allows creation and usage of ray tracing pipelines
+        ///
+        /// Supported platforms
+        /// - Vulkan
+        ///
+        const EXPERIMENTAL_RAY_TRACING_PIPELINES = 1 << 52;
     }
 
     /// Features that are not guaranteed to be supported.

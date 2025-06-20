@@ -572,3 +572,134 @@ impl RenderPipeline {
         self.raw.as_ref()
     }
 }
+
+/// Describes a set of hit processing shaders
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RayTracingHitGroup<'a, SM = ShaderModuleId> {
+    /// The closest hit shader stage, invoked when a particular hit has been found to be the closest
+    /// and not discarded
+    pub ray_closest_hit_stage: ProgrammableStageDescriptor<'a, SM>,
+    /// The any hit shader stage, invoked when a hit has found, but may not be the closest
+    pub ray_any_hit_stage: Option<ProgrammableStageDescriptor<'a, SM>>,
+}
+
+/// cbindgen:ignore
+pub type ResolvedRayTracingHitGroup<'a> = RayTracingHitGroup<'a, Arc<ShaderModule>>;
+
+/// Describes a ray tracing pipeline.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RayTracingPipelineDescriptor<
+    'a,
+    PLL = PipelineLayoutId,
+    SM = ShaderModuleId,
+    PLC = PipelineCacheId,
+> {
+    pub label: Label<'a>,
+    /// The layout of bind groups for this pipeline.
+    pub layout: Option<PLL>,
+    /// A shader to generate rays
+    pub ray_generation_stage: ProgrammableStageDescriptor<'a, SM>,
+    /// A shader to process any missed hits
+    pub ray_miss_stage: ProgrammableStageDescriptor<'a, SM>,
+    /// A set of hit groups
+    pub ray_hit_groups: Vec<RayTracingHitGroup<'a, SM>>,
+    /// The maximum recursion depth allowed.
+    pub max_recursion_depth: u32,
+    /// The pipeline cache to use when creating this pipeline.
+    pub cache: Option<PLC>,
+}
+
+/// cbindgen:ignore
+pub type ResolvedRayTracingPipelineDescriptor<'a> =
+    RayTracingPipelineDescriptor<'a, Arc<PipelineLayout>, Arc<ShaderModule>, Arc<PipelineCache>>;
+
+#[derive(Clone, Debug, Error)]
+#[non_exhaustive]
+pub enum CreateRayTracingPipelineError {
+    #[error(transparent)]
+    Device(#[from] DeviceError),
+    #[error("Unable to derive an implicit layout")]
+    Implicit(#[from] ImplicitLayoutError),
+    #[error(transparent)]
+    MissingFeatures(#[from] MissingFeatures),
+    #[error(transparent)]
+    MissingDownlevelFlags(#[from] MissingDownlevelFlags),
+    #[error("Error matching {stage:?} shader requirements against the pipeline")]
+    Stage {
+        stage: wgt::ShaderStages,
+        #[source]
+        error: validation::StageError,
+    },
+    #[error("Internal error in {stage:?} shader: {error}")]
+    Internal {
+        stage: wgt::ShaderStages,
+        error: String,
+    },
+    #[error("Pipeline constant error in {stage:?} shader: {error}")]
+    PipelineConstants {
+        stage: wgt::ShaderStages,
+        error: String,
+    },
+    #[error("In the provided shader, the type given for group {group} binding {binding} has a size of {size}. As the device does not support `DownlevelFlags::BUFFER_BINDINGS_NOT_16_BYTE_ALIGNED`, the type must have a size that is a multiple of 16 bytes.")]
+    UnalignedShader { group: u32, binding: u32, size: u64 },
+    #[error(transparent)]
+    InvalidResource(#[from] InvalidResourceError),
+}
+
+#[expect(dead_code)]
+#[derive(Debug)]
+pub struct ShaderBindingData {
+    pub(crate) buffer: ManuallyDrop<Box<dyn hal::DynBuffer>>,
+    pub(crate) ray_generation_offset: wgt::BufferAddress,
+    pub(crate) ray_generation_size: wgt::BufferSize,
+    pub(crate) ray_miss_offset: wgt::BufferAddress,
+    pub(crate) ray_miss_size: wgt::BufferSize,
+    pub(crate) ray_hit_offset: wgt::BufferAddress,
+    pub(crate) ray_hit_size: wgt::BufferSize,
+}
+
+#[expect(dead_code)]
+#[derive(Debug)]
+pub struct RayTracingPipeline {
+    pub(crate) raw: ManuallyDrop<Box<dyn hal::DynRayTracingPipeline>>,
+    pub(crate) device: Arc<Device>,
+    pub(crate) layout: Arc<PipelineLayout>,
+    pub(crate) _shader_modules: Vec<Arc<ShaderModule>>,
+    pub(crate) late_sized_buffer_groups: ArrayVec<LateSizedBufferGroup, { hal::MAX_BIND_GROUPS }>,
+    /// The `label` from the descriptor used to create the resource.
+    pub(crate) label: String,
+    pub(crate) tracking_data: TrackingData,
+    pub(crate) shader_binding_data: ShaderBindingData,
+}
+
+impl Drop for RayTracingPipeline {
+    fn drop(&mut self) {
+        resource_log!("Destroy raw {}", self.error_ident());
+        // SAFETY: We are in the Drop impl and we don't use self.raw anymore after this point.
+        let raw = unsafe { ManuallyDrop::take(&mut self.raw) };
+        unsafe {
+            self.device.raw().destroy_ray_tracing_pipeline(raw);
+        }
+
+        // SAFETY: We are in the Drop impl and we don't use self.shader_binding_data.buffer anymore after this point.
+        let raw_buffer = unsafe { ManuallyDrop::take(&mut self.shader_binding_data.buffer) };
+        unsafe {
+            self.device.raw().destroy_buffer(raw_buffer);
+        }
+    }
+}
+
+crate::impl_resource_type!(RayTracingPipeline);
+crate::impl_labeled!(RayTracingPipeline);
+crate::impl_parent_device!(RayTracingPipeline);
+crate::impl_storage_item!(RayTracingPipeline);
+crate::impl_trackable!(RayTracingPipeline);
+
+impl RayTracingPipeline {
+    #[expect(dead_code)]
+    pub(crate) fn raw(&self) -> &dyn hal::DynRayTracingPipeline {
+        self.raw.as_ref()
+    }
+}

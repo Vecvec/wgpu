@@ -2457,6 +2457,183 @@ impl crate::Device for super::Device {
         self.counters.compute_pipelines.sub(1);
     }
 
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &crate::RayTracingPipelineDescriptor<
+            super::PipelineLayout,
+            super::ShaderModule,
+            super::PipelineCache,
+        >,
+    ) -> Result<super::RayTracingPipeline, crate::PipelineError> {
+        let ray_tracing_functions = self
+            .shared
+            .extension_fns
+            .ray_tracing_pipeline
+            .as_ref()
+            .expect("Feature `RAY_TRACING_PIPELINES` not enabled");
+
+        let mut raw_compiled_stages = Vec::new();
+        let mut create_infos = Vec::new();
+        let mut group_create_infos = Vec::new();
+
+        let compiled_ray_gen = self.compile_stage(
+            &desc.ray_generation_stage,
+            naga::ShaderStage::RayGeneration,
+            &desc.layout.binding_arrays,
+        )?;
+
+        group_create_infos.push(
+            vk::RayTracingShaderGroupCreateInfoKHR::default()
+                .ty(vk::RayTracingShaderGroupTypeKHR::GENERAL)
+                .general_shader(0)
+                .closest_hit_shader(vk::SHADER_UNUSED_KHR)
+                .any_hit_shader(vk::SHADER_UNUSED_KHR)
+                .intersection_shader(vk::SHADER_UNUSED_KHR),
+        );
+        create_infos.push(compiled_ray_gen.create_info);
+        raw_compiled_stages.push(compiled_ray_gen);
+
+        let compiled_ray_miss = self.compile_stage(
+            &desc.ray_miss_stage,
+            naga::ShaderStage::RayMiss,
+            &desc.layout.binding_arrays,
+        )?;
+
+        group_create_infos.push(
+            vk::RayTracingShaderGroupCreateInfoKHR::default()
+                .ty(vk::RayTracingShaderGroupTypeKHR::GENERAL)
+                .general_shader(1)
+                .closest_hit_shader(vk::SHADER_UNUSED_KHR)
+                .any_hit_shader(vk::SHADER_UNUSED_KHR)
+                .intersection_shader(vk::SHADER_UNUSED_KHR),
+        );
+        create_infos.push(compiled_ray_miss.create_info);
+        raw_compiled_stages.push(compiled_ray_miss);
+
+        for intersection_group in &desc.intersection_groups {
+            let compiled_closest_hit = self.compile_stage(
+                &intersection_group.ray_closest_hit,
+                naga::ShaderStage::RayClosestHit,
+                &desc.layout.binding_arrays,
+            )?;
+
+            let closest_hit_index = create_infos.len() as u32;
+            create_infos.push(compiled_closest_hit.create_info);
+            raw_compiled_stages.push(compiled_closest_hit);
+
+            let mut any_hit_index = vk::SHADER_UNUSED_KHR;
+            if let Some(ref any_hit) = intersection_group.ray_any_hit {
+                let compiled_any_hit = self.compile_stage(
+                    any_hit,
+                    naga::ShaderStage::RayAnyHit,
+                    &desc.layout.binding_arrays,
+                )?;
+
+                any_hit_index = create_infos.len() as u32;
+                create_infos.push(compiled_any_hit.create_info);
+                raw_compiled_stages.push(compiled_any_hit);
+            }
+            group_create_infos.push(
+                vk::RayTracingShaderGroupCreateInfoKHR::default()
+                    .ty(vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP)
+                    .general_shader(vk::SHADER_UNUSED_KHR)
+                    .closest_hit_shader(closest_hit_index)
+                    .any_hit_shader(any_hit_index)
+                    .intersection_shader(vk::SHADER_UNUSED_KHR),
+            );
+        }
+
+        let pipeline_cache = desc
+            .cache
+            .map(|it| it.raw)
+            .unwrap_or(vk::PipelineCache::null());
+
+        let vk_infos = [vk::RayTracingPipelineCreateInfoKHR::default()
+            .layout(desc.layout.raw)
+            .stages(&create_infos)
+            .groups(&group_create_infos)
+            .max_pipeline_ray_recursion_depth(desc.max_recursion_depth)];
+
+        let mut raw_vec = {
+            profiling::scope!("vkCreateRayTracingPipelines");
+            unsafe {
+                ray_tracing_functions
+                    .create_ray_tracing_pipelines(
+                        vk::DeferredOperationKHR::null(),
+                        pipeline_cache,
+                        &vk_infos,
+                        None,
+                    )
+                    .map_err(|(_, e)| super::map_pipeline_err(e))
+            }?
+        };
+
+        let raw = raw_vec.pop().unwrap();
+        if let Some(label) = desc.label {
+            unsafe { self.shared.set_object_name(raw, label) };
+        }
+
+        for stage in raw_compiled_stages {
+            if let Some(raw_module) = stage.temp_raw_module {
+                unsafe { self.shared.raw.destroy_shader_module(raw_module, None) };
+            }
+        }
+
+        self.counters.ray_tracing_pipelines.add(1);
+
+        Ok(super::RayTracingPipeline {
+            raw,
+            num_groups: group_create_infos.len(),
+        })
+    }
+
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: super::RayTracingPipeline) {
+        unsafe { self.shared.raw.destroy_pipeline(pipeline.raw, None) };
+
+        self.counters.ray_tracing_pipelines.sub(1);
+    }
+
+    unsafe fn get_shader_binding_data(
+        &self,
+        pipeline: &super::RayTracingPipeline,
+    ) -> Result<crate::ShaderBindingData, crate::DeviceError> {
+        let ray_tracing_functions = self
+            .shared
+            .extension_fns
+            .ray_tracing_pipeline
+            .as_ref()
+            .expect("Feature `RAY_TRACING_PIPELINES` not enabled");
+
+        let data = unsafe {
+            ray_tracing_functions
+                .get_ray_tracing_shader_group_handles(
+                    pipeline.raw,
+                    0,
+                    pipeline.num_groups as u32,
+                    self.shared.private_caps.shader_group_handle_size as usize
+                        * pipeline.num_groups,
+                )
+                .map_err(super::map_host_device_oom_err)?
+        };
+
+        let ray_gen_size = self.shared.private_caps.shader_group_handle_size as wgt::BufferAddress;
+
+        let ray_miss_size = self.shared.private_caps.shader_group_handle_size as wgt::BufferAddress;
+
+        let ray_hit_size = self.shared.private_caps.shader_group_handle_size as wgt::BufferAddress
+            * (pipeline.num_groups - 2) as wgt::BufferAddress;
+
+        Ok(crate::ShaderBindingData {
+            ray_generation_offset: 0,
+            ray_generation_size: wgt::BufferSize::new(ray_gen_size).unwrap(),
+            ray_miss_offset: ray_gen_size,
+            ray_miss_size: wgt::BufferSize::new(ray_miss_size).unwrap(),
+            ray_hit_offset: ray_gen_size + ray_miss_size,
+            ray_hit_size: wgt::BufferSize::new(ray_hit_size).unwrap(),
+            data,
+        })
+    }
+
     unsafe fn create_pipeline_cache(
         &self,
         desc: &crate::PipelineCacheDescriptor<'_>,
