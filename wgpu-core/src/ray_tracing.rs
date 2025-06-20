@@ -16,7 +16,7 @@ use wgt::{AccelerationStructureGeometryFlags, BufferAddress, IndexFormat, Vertex
 use crate::{
     command::EncoderStateError,
     device::{DeviceError, MissingFeatures},
-    id::{BlasId, BufferId, TlasId},
+    id::{BlasId, BufferId, TlasId, RayTracingPipelineId},
     resource::{
         Blas, BlasCompactCallback, BlasPrepareCompactResult, DestroyedResourceError,
         InvalidResourceError, MissingBufferUsageError, ResourceErrorIdent, Tlas,
@@ -143,6 +143,10 @@ pub enum BuildAccelerationStructureError {
         "Tlas {0:?} dependent {1:?} is missing AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN"
     )]
     TlasDependentMissingVertexReturn(ResourceErrorIdent, ResourceErrorIdent),
+    #[error("In Tlas {0:?}, of `tlas.linked_pipeline` or `instance.linked_pipeline_hit_group_index` was set, but the other was not")]
+    TlasLinkedPipelineInstanceHitGroupIndexMismatch(ResourceErrorIdent),
+    #[error("Linked pipeline {0:?} for Tlas {1:?} has a hit group count ({2}) less than or equal to the index provided ({3}) in an instance")]
+    TooLargeHitGroupIndex(ResourceErrorIdent, ResourceErrorIdent, u32, u32),
 }
 
 #[derive(Clone, Debug, Error)]
@@ -195,12 +199,14 @@ pub struct TlasInstance<'a> {
     pub transform: &'a [f32; 12],
     pub custom_data: u32,
     pub mask: u8,
+    pub ray_hit_group_index: Option<u32>,
 }
 
 pub struct TlasPackage<'a> {
     pub tlas_id: TlasId,
     pub instances: Box<dyn Iterator<Item = Option<TlasInstance<'a>>> + 'a>,
     pub lowest_unmodified: u32,
+    pub linked_pipeline: Option<RayTracingPipelineId>,
 }
 
 #[derive(Debug, Clone)]
@@ -254,6 +260,7 @@ pub struct TraceTlasInstance {
     pub transform: [f32; 12],
     pub custom_data: u32,
     pub mask: u8,
+    pub ray_hit_group_index: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -262,6 +269,7 @@ pub struct TraceTlasPackage {
     pub tlas_id: TlasId,
     pub instances: Vec<Option<TraceTlasInstance>>,
     pub lowest_unmodified: u32,
+    pub linked_ray_tracing_pipeline: Option<RayTracingPipelineId>
 }
 
 #[derive(Clone, Debug, Error)]

@@ -1,4 +1,5 @@
 use wgpu::include_wgsl;
+use wgpu::wgt::AccelerationStructureFlags;
 use wgpu_macros::gpu_test;
 use wgpu_test::{FailureCase, GpuTestConfiguration, TestParameters, TestingContext};
 
@@ -20,7 +21,7 @@ fn ray_tracing_pipelines(ctx: TestingContext) {
     let shader = ctx
         .device
         .create_shader_module(include_wgsl!("ray_tracing_pipeline.wgsl"));
-    let _ = ctx
+    let pipeline = ctx
         .device
         .create_ray_tracing_pipeline(&wgpu::RayTracingPipelineDescriptor {
             label: None,
@@ -46,4 +47,11 @@ fn ray_tracing_pipelines(ctx: TestingContext) {
             max_recursion_depth: 1,
             cache: None,
         });
+    let mut acceleration_structure_ctx = super::AsBuildContext::new(&ctx, AccelerationStructureFlags::empty(), AccelerationStructureFlags::empty());
+    acceleration_structure_ctx.tlas.linked_pipeline = Some(pipeline);
+    acceleration_structure_ctx.tlas[0].as_mut().unwrap().linked_pipeline_hit_group_index = Some(0);
+    let mut encoder = ctx.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    encoder.build_acceleration_structures([&acceleration_structure_ctx.blas_build_entry()], [&acceleration_structure_ctx.tlas]);
+    ctx.queue.submit(Some(encoder.finish()));
+
 }

@@ -620,6 +620,7 @@ impl super::Adapter {
                     raw_tlas_instance_size: size_of::<Direct3D12::D3D12_RAYTRACING_INSTANCE_DESC>(),
                     ray_tracing_scratch_buffer_alignment:
                         Direct3D12::D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT,
+                    shader_binding_table_stride: 0,
                 },
                 downlevel,
             },

@@ -37,6 +37,7 @@ static_assertions::assert_impl_all!(CreateBlasDescriptor<'_>: Send, Sync);
 /// Each one contains:
 /// - A reference to a BLAS, this ***must*** be interacted with using [TlasInstance::new] or [TlasInstance::set_blas], a
 ///   TlasInstance that references a BLAS keeps that BLAS from being dropped
+/// - An optional index for a hit group in a ray tracing pipeline.
 /// - A user accessible transformation matrix
 /// - A user accessible mask
 /// - A user accessible custom index
@@ -45,6 +46,12 @@ static_assertions::assert_impl_all!(CreateBlasDescriptor<'_>: Send, Sync);
 #[derive(Debug, Clone)]
 pub struct TlasInstance {
     pub(crate) blas: dispatch::DispatchBlas,
+    /// The index into the ray tracing pipeline set in the [`Tlas`]. Must be [`None`] if there is no
+    /// ray tracing pipeline set, and [`Some`] if there is a ray tracing pipeline set otherwise this
+    /// [`TlasInstance`] is invalid.
+    ///
+    /// [`Tlas`]: crate::Tlas
+    pub linked_pipeline_hit_group_index: Option<u32>,
     /// Affine transform matrix 3x4 (rows x columns, row major order).
     pub transform: [f32; 12],
     /// Custom index for the instance used inside the shader.
@@ -63,15 +70,17 @@ impl TlasInstance {
     /// - transform: Transform buffer offset in bytes (optional, required if transform buffer is present)
     /// - custom_data: Custom index for the instance used inside the shader (max 24 bits)
     /// - mask: Mask for the instance used inside the shader to filter instances
+    /// - linked_pipeline_hit_group_index: optional index into the TLAS's linked ray tracing pipeline
     ///
     /// Note: while one of these contains a reference to a BLAS that BLAS will not be dropped,
     /// but it can still be destroyed. Destroying a BLAS that is referenced by one or more
     /// TlasInstance(s) will immediately make them invalid. If one or more of those invalid
     /// TlasInstances is inside a TlasPackage that is attempted to be built, the build will
     /// generate a validation error.
-    pub fn new(blas: &Blas, transform: [f32; 12], custom_data: u32, mask: u8) -> Self {
+    pub fn new(blas: &Blas, transform: [f32; 12], custom_data: u32, mask: u8, linked_pipeline_hit_group_index: Option<u32>) -> Self {
         Self {
             blas: blas.inner.clone(),
+            linked_pipeline_hit_group_index,
             transform,
             custom_data,
             mask,

@@ -22,6 +22,8 @@ pub struct Tlas {
     pub(crate) inner: dispatch::DispatchTlas,
     pub(crate) instances: Vec<Option<TlasInstance>>,
     pub(crate) lowest_unmodified: u32,
+    /// The raytracing pipeline linked to this TLAS.
+    pub linked_pipeline: Option<crate::RayTracingPipeline>,
 }
 static_assertions::assert_impl_all!(Tlas: WasmNotSendSync);
 

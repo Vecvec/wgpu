@@ -2793,12 +2793,14 @@ impl dispatch::CommandEncoderInterface for CoreCommandEncoder {
                             transform: &instance.transform,
                             custom_data: instance.custom_data,
                             mask: instance.mask,
+                            ray_hit_group_index: instance.linked_pipeline_hit_group_index,
                         })
                 });
             wgc::ray_tracing::TlasPackage {
                 tlas_id: e.inner.as_core().id,
                 instances: Box::new(instances),
                 lowest_unmodified: e.lowest_unmodified,
+                linked_pipeline: e.linked_pipeline.as_ref().map(|pipeline| pipeline.inner.as_core().id),
             }
         });
 

@@ -154,6 +154,7 @@ impl Global {
                             transform: *instance.transform,
                             custom_data: instance.custom_data,
                             mask: instance.mask,
+                            ray_hit_group_index: instance.ray_hit_group_index,
                         })
                     })
                     .collect();
@@ -161,6 +162,7 @@ impl Global {
                     tlas_id: package.tlas_id,
                     instances,
                     lowest_unmodified: package.lowest_unmodified,
+                    linked_ray_tracing_pipeline: package.linked_pipeline,
                 }
             })
             .collect();
@@ -194,12 +196,14 @@ impl Global {
                     transform: &instance.transform,
                     custom_data: instance.custom_data,
                     mask: instance.mask,
+                    ray_hit_group_index: instance.ray_hit_group_index,
                 })
             });
             TlasPackage {
                 tlas_id: tlas_package.tlas_id,
                 instances: Box::new(instances),
                 lowest_unmodified: tlas_package.lowest_unmodified,
+                linked_pipeline: tlas_package.linked_ray_tracing_pipeline,
             }
         });
 
@@ -256,6 +260,12 @@ impl Global {
             for (package, tlas) in &mut tlas_lock_store {
                 let package = package.take().unwrap();
 
+                let mut linked_pipeline = None;
+
+                if let Some(pipeline) = package.linked_pipeline {
+                    linked_pipeline = Some(hub.ray_tracing_pipelines.get(pipeline).get()?);
+                }
+
                 let scratch_buffer_offset = scratch_buffer_tlas_size;
                 scratch_buffer_tlas_size += align_to(
                     tlas.size_info.build_scratch_size as u32,
@@ -266,25 +276,41 @@ impl Global {
 
                 let mut dependencies = Vec::new();
 
-                let mut instance_count = 0;
-                for instance in package.instances.flatten() {
-                    if instance.custom_data >= (1u32 << 24u32) {
-                        return Err(BuildAccelerationStructureError::TlasInvalidCustomIndex(
-                            tlas.error_ident(),
-                        ));
+            let mut instance_count = 0;
+            for instance in package.instances.flatten() {
+                if instance.custom_data >= (1u32 << 24u32) {
+                    return Err(BuildAccelerationStructureError::TlasInvalidCustomIndex(
+                        tlas.error_ident(),
+                    ));
+                }
+
+                match (instance.ray_hit_group_index, linked_pipeline.as_ref()) {
+                    (Some(index), Some(pipeline)) => {
+                        if index >= pipeline.num_hit_groups {
+                            return Err(BuildAccelerationStructureError::TooLargeHitGroupIndex(pipeline.error_ident(), tlas.error_ident(), pipeline.num_hit_groups, index));
+                        }
                     }
-                    let blas = hub.blas_s.get(instance.blas_id).get()?;
+                    (None, None) => {}
+                    _ => return Err(BuildAccelerationStructureError::TlasLinkedPipelineInstanceHitGroupIndexMismatch(tlas.error_ident())),
+                }
+
+                let sbt_offset = instance.ray_hit_group_index.unwrap_or(0) * device.alignments.shader_binding_table_stride;
+
+                debug_assert!(sbt_offset < (1 << 24), "SBT offset was extremely high");
+
+                let blas = hub.blas_s.get(instance.blas_id).get()?;
 
                     cmd_buf_data.trackers.blas_s.insert_single(blas.clone());
 
-                    instance_buffer_staging_source.extend(device.raw().tlas_instance_to_bytes(
-                        hal::TlasInstance {
-                            transform: *instance.transform,
-                            custom_data: instance.custom_data,
-                            mask: instance.mask,
-                            blas_address: blas.handle,
-                        },
-                    ));
+                instance_buffer_staging_source.extend(device.raw().tlas_instance_to_bytes(
+                    hal::TlasInstance {
+                        transform: *instance.transform,
+                        custom_data: instance.custom_data,
+                        mask: instance.mask,
+                        blas_address: blas.handle,
+                        shader_binding_table_offset: sbt_offset,
+                    },
+                ));
 
                     if tlas.flags.contains(
                         wgpu_types::AccelerationStructureFlags::ALLOW_RAY_HIT_VERTEX_RETURN,

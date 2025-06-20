@@ -522,6 +522,8 @@ impl Device {
                 })?
         };
 
+        let num_hit_groups = desc.ray_hit_groups.len() as u32;
+
         let shader_modules = {
             // Allocate a vector with a conservative capacity - we will need at least this many, but
             // could need almost double.
@@ -604,6 +606,7 @@ impl Device {
                 ray_hit_offset: shader_binding_data.ray_hit_offset,
                 ray_hit_size: shader_binding_data.ray_hit_size,
             },
+            num_hit_groups,
         };
 
         let pipeline = Arc::new(pipeline);

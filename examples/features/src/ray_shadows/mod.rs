@@ -249,6 +249,7 @@ impl crate::framework::Example for Example {
             [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
             0,
             0xFF,
+            None,
         ));
 
         let mut encoder =

@@ -156,12 +156,14 @@ impl GlobalPlay for wgc::global::Global {
                                     transform: &instance.transform,
                                     custom_data: instance.custom_data,
                                     mask: instance.mask,
+                                    ray_hit_group_index: instance.ray_hit_group_index,
                                 })
                         });
                         wgc::ray_tracing::TlasPackage {
                             tlas_id: x.tlas_id,
                             instances: Box::new(instances),
                             lowest_unmodified: x.lowest_unmodified,
+                            linked_pipeline: x.linked_ray_tracing_pipeline,
                         }
                     });
 

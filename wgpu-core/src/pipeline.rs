@@ -672,6 +672,7 @@ pub struct RayTracingPipeline {
     pub(crate) label: String,
     pub(crate) tracking_data: TrackingData,
     pub(crate) shader_binding_data: ShaderBindingData,
+    pub(crate) num_hit_groups: u32,
 }
 
 impl Drop for RayTracingPipeline {

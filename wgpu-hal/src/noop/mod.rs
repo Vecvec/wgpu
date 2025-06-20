@@ -187,6 +187,7 @@ const CAPABILITIES: crate::Capabilities = {
             uniform_bounds_check_alignment: wgt::BufferSize::MIN,
             raw_tlas_instance_size: 0,
             ray_tracing_scratch_buffer_alignment: 1,
+            shader_binding_table_stride: 1,
         },
         downlevel: wgt::DownlevelCapabilities {
             flags: wgt::DownlevelFlags::all(),

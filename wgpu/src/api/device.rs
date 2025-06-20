@@ -617,6 +617,7 @@ impl Device {
             inner: tlas,
             instances: vec![None; desc.max_instances as usize],
             lowest_unmodified: 0,
+            linked_pipeline: None,
         }
     }
 }

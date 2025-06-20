@@ -1797,6 +1797,9 @@ pub struct Alignments {
 
     /// What the scratch buffer for building an acceleration structure must be aligned to
     pub ray_tracing_scratch_buffer_alignment: u32,
+
+    /// The size of a single shader binding table entry in a ray tracing pipeline
+    pub shader_binding_table_stride: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -2604,4 +2607,5 @@ pub struct TlasInstance {
     pub custom_data: u32,
     pub mask: u8,
     pub blas_address: u64,
+    pub shader_binding_table_offset: u32,
 }

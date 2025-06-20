@@ -61,6 +61,7 @@ fn acceleration_structure_use_after_free(ctx: TestingContext) {
         [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
         0,
         0xFF,
+        None,
     ));
 
     // Actually build the BLAS.

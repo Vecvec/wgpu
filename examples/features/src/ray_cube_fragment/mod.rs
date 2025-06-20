@@ -331,7 +331,7 @@ impl crate::framework::Example for Example {
                         .try_into()
                         .unwrap();
 
-                    *instance = Some(wgpu::TlasInstance::new(&self.blas, transform, 0, 0xff));
+                    *instance = Some(wgpu::TlasInstance::new(&self.blas, transform, 0, 0xff, None));
                 }
             }
         }
