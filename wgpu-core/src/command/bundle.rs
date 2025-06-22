@@ -687,7 +687,8 @@ fn set_push_constant(
     pipeline_state
         .pipeline
         .layout
-        .validate_push_constant_ranges(stages, offset, end_offset)?;
+        .validate_push_constant_ranges(stages, offset, end_offset)
+        .map_err(|e| RenderCommandError::GeneralPass(pass::PassError::PushConstants(e)))?;
 
     state.commands.push(ArcRenderCommand::SetPushConstant {
         stages,

@@ -5,7 +5,7 @@ use thiserror::Error;
 use super::bind::BinderError;
 use crate::command::pass;
 use crate::{
-    binding_model::{LateMinBufferBindingSizeMismatch, PushConstantUploadError},
+    binding_model::LateMinBufferBindingSizeMismatch,
     resource::{MissingBufferUsageError, MissingTextureUsageError, ResourceErrorIdent},
     track::ResourceUsageCompatibilityError,
 };
@@ -74,8 +74,6 @@ pub enum RenderCommandError {
     MissingBufferUsage(#[from] MissingBufferUsageError),
     #[error(transparent)]
     MissingTextureUsage(#[from] MissingTextureUsageError),
-    #[error(transparent)]
-    PushConstants(#[from] PushConstantUploadError),
     #[error("Viewport size {{ w: {w}, h: {h} }} greater than device's requested `max_texture_dimension_2d` limit {max}, or less than zero")]
     InvalidViewportRectSize { w: f32, h: f32, max: u32 },
     #[error("Viewport has invalid rect {rect:?} for device's requested `max_texture_dimension_2d` limit; Origin less than -2 * `max_texture_dimension_2d` ({min}), or rect extends past 2 * `max_texture_dimension_2d` - 1 ({max})")]
