@@ -14,9 +14,9 @@ use crate::{
         memory_init::{fixup_discarded_surfaces, SurfacesInDiscardState},
         validate_and_begin_pipeline_statistics_query, ArcPassTimestampWrites, BasePass,
         BindGroupStateChange, CommandBuffer, CommandEncoderError, MapPassErr, PassErrorScope,
-        PassTimestampWrites, QueryUseError, StateChange,
+        PassTimestampWrites, StateChange,
     },
-    device::{DeviceError, MissingDownlevelFlags, MissingFeatures},
+    device::{DeviceError, MissingDownlevelFlags},
     global::Global,
     hal_label, id,
     init_tracker::MemoryInitKind,
@@ -145,10 +145,6 @@ pub enum ComputePassErrorInner {
     PushConstantSizeAlignment,
     #[error("Ran out of push constant space. Don't set 4gb of push constants per ComputePass.")]
     PushConstantOutOfMemory,
-    #[error(transparent)]
-    QueryUse(#[from] QueryUseError),
-    #[error(transparent)]
-    MissingFeatures(#[from] MissingFeatures),
     #[error(transparent)]
     MissingDownlevelFlags(#[from] MissingDownlevelFlags),
     #[error("The compute pass has already been ended and no further commands can be recorded")]
@@ -516,8 +512,15 @@ impl Global {
                     query_index,
                 } => {
                     let scope = PassErrorScope::WriteTimestamp;
-                    write_timestamp(&mut state, cmd_buf, query_set, query_index)
-                        .map_pass_err(scope)?;
+                    pass::write_timestamp(
+                        &mut state.general,
+                        cmd_buf,
+                        None,
+                        query_set,
+                        query_index,
+                    )
+                    .map_err(ComputePassErrorInner::GeneralPass)
+                    .map_pass_err(scope)?;
                 }
                 ArcComputeCommand::BeginPipelineStatisticsQuery {
                     query_set,
@@ -533,6 +536,7 @@ impl Global {
                         None,
                         &mut state.active_query,
                     )
+                    .map_err(|e| ComputePassErrorInner::GeneralPass(pass::PassError::QueryUse(e)))
                     .map_pass_err(scope)?;
                 }
                 ArcComputeCommand::EndPipelineStatisticsQuery => {
@@ -541,6 +545,7 @@ impl Global {
                         state.general.raw_encoder,
                         &mut state.active_query,
                     )
+                    .map_err(|e| ComputePassErrorInner::GeneralPass(pass::PassError::QueryUse(e)))
                     .map_pass_err(scope)?;
                 }
             }
@@ -900,27 +905,6 @@ fn insert_debug_marker(state: &mut State, string_data: &[u8], len: usize) {
         unsafe { state.general.raw_encoder.insert_debug_marker(label) }
     }
     state.string_offset += len;
-}
-
-fn write_timestamp(
-    state: &mut State,
-    cmd_buf: &CommandBuffer,
-    query_set: Arc<resource::QuerySet>,
-    query_index: u32,
-) -> Result<(), ComputePassErrorInner> {
-    query_set
-        .same_device_as(cmd_buf)
-        .map_err(pass::PassError::Device)?;
-
-    state
-        .general
-        .device
-        .require_features(wgt::Features::TIMESTAMP_QUERY_INSIDE_PASSES)?;
-
-    let query_set = state.general.tracker.query_sets.insert_single(query_set);
-
-    query_set.validate_and_write_timestamp(state.general.raw_encoder, query_index, None)?;
-    Ok(())
 }
 
 // Recording a compute pass.

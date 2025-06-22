@@ -3,12 +3,12 @@
 use crate::binding_model::{BindError, BindGroup, PushConstantUploadError};
 use crate::command::bind::Binder;
 use crate::command::memory_init::{CommandBufferTextureMemoryActions, SurfacesInDiscardState};
-use crate::command::CommandBuffer;
-use crate::device::{Device, DeviceError};
+use crate::command::{CommandBuffer, QueryResetMap, QueryUseError};
+use crate::device::{Device, DeviceError, MissingFeatures};
 use crate::init_tracker::BufferInitTrackerAction;
 use crate::pipeline::LateSizedBufferGroup;
 use crate::ray_tracing::AsAction;
-use crate::resource::{DestroyedResourceError, Labeled, ParentDevice};
+use crate::resource::{DestroyedResourceError, Labeled, ParentDevice, QuerySet};
 use crate::snatch::SnatchGuard;
 use crate::track::{ResourceUsageCompatibilityError, Tracker, UsageScope};
 use crate::{api_log, binding_model};
@@ -30,6 +30,10 @@ pub enum PassError {
     DestroyedResource(#[from] DestroyedResourceError),
     #[error(transparent)]
     PushConstants(#[from] PushConstantUploadError),
+    #[error(transparent)]
+    MissingFeatures(#[from] MissingFeatures),
+    #[error(transparent)]
+    QueryUse(#[from] QueryUseError),
     #[error("Bind group index {index} is greater than the device's requested `max_bind_group` limit {max}")]
     BindGroupIndexOutOfRange { index: u32, max: u32 },
     #[error("Setting `values_offset` to be `None` is only for internal use in render bundles")]
@@ -252,5 +256,29 @@ pub(crate) fn set_push_constant<F: FnOnce(&[u32])>(
             .raw_encoder
             .set_push_constants(pipeline_layout.raw(), stages, offset, data_slice)
     }
+    Ok(())
+}
+
+pub(crate) fn write_timestamp(
+    state: &mut BaseState,
+    cmd_buf: &CommandBuffer,
+    pending_query_resets: Option<&mut QueryResetMap>,
+    query_set: Arc<QuerySet>,
+    query_index: u32,
+) -> Result<(), PassError> {
+    api_log!(
+        "Pass::write_timestamps {query_index} {}",
+        query_set.error_ident()
+    );
+
+    query_set.same_device_as(cmd_buf)?;
+
+    state
+        .device
+        .require_features(wgt::Features::TIMESTAMP_QUERY_INSIDE_PASSES)?;
+
+    let query_set = state.tracker.query_sets.insert_single(query_set);
+
+    query_set.validate_and_write_timestamp(state.raw_encoder, query_index, pending_query_resets)?;
     Ok(())
 }
