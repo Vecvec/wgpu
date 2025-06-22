@@ -2800,7 +2800,10 @@ impl dispatch::CommandEncoderInterface for CoreCommandEncoder {
                 tlas_id: e.inner.as_core().id,
                 instances: Box::new(instances),
                 lowest_unmodified: e.lowest_unmodified,
-                linked_pipeline: e.linked_pipeline.as_ref().map(|pipeline| pipeline.inner.as_core().id),
+                linked_pipeline: e
+                    .linked_pipeline
+                    .as_ref()
+                    .map(|pipeline| pipeline.inner.as_core().id),
             }
         });
 

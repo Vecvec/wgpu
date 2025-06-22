@@ -756,7 +756,9 @@ impl super::Validator {
                 Alignment::ONE,
             ),
             Ti::AccelerationStructure { vertex_return } => {
-                self.require_any_type_capability(Capabilities::RAY_QUERY | Capabilities::RAY_TRACING_PIPELINE)?;
+                self.require_any_type_capability(
+                    Capabilities::RAY_QUERY | Capabilities::RAY_TRACING_PIPELINE,
+                )?;
                 if vertex_return {
                     self.require_type_capability(Capabilities::RAY_HIT_VERTEX_POSITION)?;
                 }

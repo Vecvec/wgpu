@@ -1342,9 +1342,11 @@ impl PhysicalDeviceProperties {
                     acceleration_structure.min_acceleration_structure_scratch_offset_alignment
                 },
             ),
-            shader_binding_table_stride: self.ray_tracing_pipeline.map_or(0, |ray_tracing_pipeline| {
-                ray_tracing_pipeline.shader_group_handle_alignment
-            })
+            shader_binding_table_stride: self
+                .ray_tracing_pipeline
+                .map_or(0, |ray_tracing_pipeline| {
+                    ray_tracing_pipeline.shader_group_handle_alignment
+                }),
         }
     }
 }

@@ -23,11 +23,11 @@ use crate::{
     snatch::Snatchable,
     validation, LabelHelpers,
 };
+use alloc::string::String;
 use alloc::{string::ToString as _, sync::Arc, vec::Vec};
 use core::mem::{size_of, ManuallyDrop};
-use hal::AccelerationStructureTriangleIndices;
-use alloc::string::String;
 use core::ptr;
+use hal::AccelerationStructureTriangleIndices;
 use wgt::Features;
 
 impl Device {

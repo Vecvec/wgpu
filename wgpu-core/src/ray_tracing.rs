@@ -16,7 +16,7 @@ use wgt::{AccelerationStructureGeometryFlags, BufferAddress, IndexFormat, Vertex
 use crate::{
     command::EncoderStateError,
     device::{DeviceError, MissingFeatures},
-    id::{BlasId, BufferId, TlasId, RayTracingPipelineId},
+    id::{BlasId, BufferId, RayTracingPipelineId, TlasId},
     resource::{
         Blas, BlasCompactCallback, BlasPrepareCompactResult, DestroyedResourceError,
         InvalidResourceError, MissingBufferUsageError, ResourceErrorIdent, Tlas,
@@ -269,7 +269,7 @@ pub struct TraceTlasPackage {
     pub tlas_id: TlasId,
     pub instances: Vec<Option<TraceTlasInstance>>,
     pub lowest_unmodified: u32,
-    pub linked_ray_tracing_pipeline: Option<RayTracingPipelineId>
+    pub linked_ray_tracing_pipeline: Option<RayTracingPipelineId>,
 }
 
 #[derive(Clone, Debug, Error)]
