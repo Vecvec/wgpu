@@ -2,16 +2,13 @@ use alloc::boxed::Box;
 
 use thiserror::Error;
 
+use super::bind::BinderError;
+use crate::command::pass;
 use crate::{
     binding_model::{LateMinBufferBindingSizeMismatch, PushConstantUploadError},
-    resource::{
-        DestroyedResourceError, MissingBufferUsageError, MissingTextureUsageError,
-        ResourceErrorIdent,
-    },
+    resource::{MissingBufferUsageError, MissingTextureUsageError, ResourceErrorIdent},
     track::ResourceUsageCompatibilityError,
 };
-
-use super::bind::BinderError;
 
 /// Error validating a draw call.
 #[derive(Clone, Debug, Error)]
@@ -61,8 +58,8 @@ pub enum DrawError {
 #[derive(Clone, Debug, Error)]
 #[non_exhaustive]
 pub enum RenderCommandError {
-    #[error("Bind group index {index} is greater than the device's requested `max_bind_group` limit {max}")]
-    BindGroupIndexOutOfRange { index: u32, max: u32 },
+    #[error(transparent)]
+    GeneralPass(#[from] pass::PassError),
     #[error("Vertex buffer index {index} is greater than the device's requested `max_vertex_buffers` limit {max}")]
     VertexBufferIndexOutOfRange { index: u32, max: u32 },
     #[error("Render pipeline targets are incompatible with render pass")]
@@ -73,8 +70,6 @@ pub enum RenderCommandError {
     IncompatibleStencilAccess(ResourceErrorIdent),
     #[error(transparent)]
     ResourceUsageCompatibility(#[from] ResourceUsageCompatibilityError),
-    #[error(transparent)]
-    DestroyedResource(#[from] DestroyedResourceError),
     #[error(transparent)]
     MissingBufferUsage(#[from] MissingBufferUsageError),
     #[error(transparent)]

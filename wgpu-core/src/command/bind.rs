@@ -405,13 +405,6 @@ impl Binder {
         &self.payloads[bind_range]
     }
 
-    pub(super) fn list_active<'a>(&'a self) -> impl Iterator<Item = &'a Arc<BindGroup>> + 'a {
-        let payloads = &self.payloads;
-        self.manager
-            .list_active()
-            .map(move |index| payloads[index].group.as_ref().unwrap())
-    }
-
     pub(super) fn list_valid<'a>(&'a self) -> impl Iterator<Item = (usize, &'a EntryPayload)> + 'a {
         self.payloads
             .iter()

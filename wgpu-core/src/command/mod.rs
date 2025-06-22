@@ -6,6 +6,7 @@ mod compute;
 mod compute_command;
 mod draw;
 mod memory_init;
+mod pass;
 mod query;
 mod ray_tracing;
 mod render;
@@ -703,20 +704,6 @@ impl CommandBuffer {
             label: label.to_string(),
             data: Mutex::new(rank::COMMAND_BUFFER_DATA, CommandEncoderStatus::Error(err)),
         }
-    }
-
-    pub(crate) fn insert_barriers_from_tracker(
-        raw: &mut dyn hal::DynCommandEncoder,
-        base: &mut Tracker,
-        head: &Tracker,
-        snatch_guard: &SnatchGuard,
-    ) {
-        profiling::scope!("insert_barriers");
-
-        base.buffers.set_from_tracker(&head.buffers);
-        base.textures.set_from_tracker(&head.textures);
-
-        Self::drain_barriers(raw, base, snatch_guard);
     }
 
     pub(crate) fn insert_barriers_from_scope(

@@ -522,46 +522,6 @@ impl TextureTracker {
         self.temp.drain(..)
     }
 
-    /// Sets the given state for all texture in the given tracker.
-    ///
-    /// If a transition is needed to get the texture into the needed state,
-    /// those transitions are stored within the tracker. A subsequent
-    /// call to [`Self::drain_transitions`] is needed to get those transitions.
-    ///
-    /// If the ID is higher than the length of internal vectors,
-    /// the vectors will be extended. A call to set_size is not needed.
-    pub fn set_from_tracker(&mut self, tracker: &Self) {
-        let incoming_size = tracker.start_set.size();
-        if incoming_size > self.start_set.size() {
-            self.set_size(incoming_size);
-        }
-
-        for index in tracker.metadata.owned_indices() {
-            self.tracker_assert_in_bounds(index);
-            tracker.tracker_assert_in_bounds(index);
-            unsafe {
-                let texture_selector = &tracker.metadata.get_resource_unchecked(index).full_range;
-                insert_or_barrier_update(
-                    texture_selector,
-                    Some(&mut self.start_set),
-                    &mut self.end_set,
-                    &mut self.metadata,
-                    index,
-                    TextureStateProvider::TextureSet {
-                        set: &tracker.start_set,
-                    },
-                    Some(TextureStateProvider::TextureSet {
-                        set: &tracker.end_set,
-                    }),
-                    ResourceMetadataProvider::Indirect {
-                        metadata: &tracker.metadata,
-                    },
-                    &mut self.temp,
-                );
-            }
-        }
-    }
-
     /// Sets the given state for all textures in the given UsageScope.
     ///
     /// If a transition is needed to get the textures into the needed state,
@@ -595,62 +555,6 @@ impl TextureTracker {
                     &mut self.temp,
                 );
             }
-        }
-    }
-
-    /// Iterates through all textures in the given bind group and adopts
-    /// the state given for those textures in the UsageScope. It also
-    /// removes all touched textures from the usage scope.
-    ///
-    /// If a transition is needed to get the textures into the needed state,
-    /// those transitions are stored within the tracker. A subsequent
-    /// call to [`Self::drain_transitions`] is needed to get those transitions.
-    ///
-    /// This is a really funky method used by Compute Passes to generate
-    /// barriers after a call to dispatch without needing to iterate
-    /// over all elements in the usage scope. We use each the
-    /// bind group as a source of which IDs to look at. The bind groups
-    /// must have first been added to the usage scope.
-    ///
-    /// # Safety
-    ///
-    /// [`Self::set_size`] must be called with the maximum possible Buffer ID before this
-    /// method is called.
-    pub unsafe fn set_and_remove_from_usage_scope_sparse(
-        &mut self,
-        scope: &mut TextureUsageScope,
-        bind_group_state: &TextureViewBindGroupState,
-    ) {
-        let incoming_size = scope.set.size();
-        if incoming_size > self.start_set.size() {
-            self.set_size(incoming_size);
-        }
-
-        for (view, _) in bind_group_state.views.iter() {
-            let index = view.parent.tracker_index().as_usize();
-            scope.tracker_assert_in_bounds(index);
-
-            if unsafe { !scope.metadata.contains_unchecked(index) } {
-                continue;
-            }
-            let texture_selector = &view.parent.full_range;
-            unsafe {
-                insert_or_barrier_update(
-                    texture_selector,
-                    Some(&mut self.start_set),
-                    &mut self.end_set,
-                    &mut self.metadata,
-                    index,
-                    TextureStateProvider::TextureSet { set: &scope.set },
-                    None,
-                    ResourceMetadataProvider::Indirect {
-                        metadata: &scope.metadata,
-                    },
-                    &mut self.temp,
-                )
-            };
-
-            unsafe { scope.metadata.remove(index) };
         }
     }
 }

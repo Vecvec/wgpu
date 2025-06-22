@@ -12,7 +12,7 @@ use alloc::{
 use hal::BufferBarrier;
 use wgt::{strict_assert, strict_assert_eq, BufferUses};
 
-use super::{PendingTransition, TrackerIndex};
+use super::PendingTransition;
 use crate::{
     resource::{Buffer, Trackable},
     snatch::SnatchGuard,
@@ -59,15 +59,6 @@ impl BufferBindGroupState {
     pub(crate) fn optimize(&mut self) {
         self.buffers
             .sort_unstable_by_key(|(b, _)| b.tracker_index());
-    }
-
-    /// Returns a list of all buffers tracked. May contain duplicates.
-    pub fn used_tracker_indices(&self) -> impl Iterator<Item = TrackerIndex> + '_ {
-        self.buffers
-            .iter()
-            .map(|(b, _)| b.tracker_index())
-            .collect::<Vec<_>>()
-            .into_iter()
     }
 
     /// Adds the given resource with the given state.
@@ -363,40 +354,6 @@ impl BufferTracker {
         self.temp.pop()
     }
 
-    /// Sets the given state for all buffers in the given tracker.
-    ///
-    /// If a transition is needed to get the buffers into the needed state,
-    /// those transitions are stored within the tracker. A subsequent
-    /// call to [`Self::drain_transitions`] is needed to get those transitions.
-    ///
-    /// If the ID is higher than the length of internal vectors,
-    /// the vectors will be extended. A call to set_size is not needed.
-    pub fn set_from_tracker(&mut self, tracker: &Self) {
-        let incoming_size = tracker.start.len();
-        if incoming_size > self.start.len() {
-            self.set_size(incoming_size);
-        }
-
-        for index in tracker.metadata.owned_indices() {
-            self.tracker_assert_in_bounds(index);
-            tracker.tracker_assert_in_bounds(index);
-            unsafe {
-                self.insert_or_barrier_update(
-                    index,
-                    BufferStateProvider::Indirect {
-                        state: &tracker.start,
-                    },
-                    Some(BufferStateProvider::Indirect {
-                        state: &tracker.end,
-                    }),
-                    ResourceMetadataProvider::Indirect {
-                        metadata: &tracker.metadata,
-                    },
-                )
-            }
-        }
-    }
-
     /// Sets the given state for all buffers in the given UsageScope.
     ///
     /// If a transition is needed to get the buffers into the needed state,
@@ -426,59 +383,6 @@ impl BufferTracker {
                     },
                 )
             }
-        }
-    }
-
-    /// Iterates through all buffers in the given bind group and adopts
-    /// the state given for those buffers in the UsageScope. It also
-    /// removes all touched buffers from the usage scope.
-    ///
-    /// If a transition is needed to get the buffers into the needed state,
-    /// those transitions are stored within the tracker. A subsequent
-    /// call to [`Self::drain_transitions`] is needed to get those transitions.
-    ///
-    /// This is a really funky method used by Compute Passes to generate
-    /// barriers after a call to dispatch without needing to iterate
-    /// over all elements in the usage scope. We use each the
-    /// a given iterator of ids as a source of which IDs to look at.
-    /// All the IDs must have first been added to the usage scope.
-    ///
-    /// # Safety
-    ///
-    /// [`Self::set_size`] must be called with the maximum possible Buffer ID before this
-    /// method is called.
-    pub unsafe fn set_and_remove_from_usage_scope_sparse(
-        &mut self,
-        scope: &mut BufferUsageScope,
-        index_source: impl IntoIterator<Item = TrackerIndex>,
-    ) {
-        let incoming_size = scope.state.len();
-        if incoming_size > self.start.len() {
-            self.set_size(incoming_size);
-        }
-
-        for index in index_source {
-            let index = index.as_usize();
-
-            scope.tracker_assert_in_bounds(index);
-
-            if unsafe { !scope.metadata.contains_unchecked(index) } {
-                continue;
-            }
-            unsafe {
-                self.insert_or_barrier_update(
-                    index,
-                    BufferStateProvider::Indirect {
-                        state: &scope.state,
-                    },
-                    None,
-                    ResourceMetadataProvider::Indirect {
-                        metadata: &scope.metadata,
-                    },
-                )
-            };
-
-            unsafe { scope.metadata.remove(index) };
         }
     }
 
