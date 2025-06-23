@@ -1,12 +1,12 @@
-use alloc::{boxed::Box, vec::Vec};
-use core::ops::Range;
-
 use crate::{
     AccelerationStructureBarrier, Api, Attachment, BufferBarrier, BufferBinding, BufferCopy,
     BufferTextureCopy, BuildAccelerationStructureDescriptor, ColorAttachment, CommandEncoder,
-    ComputePassDescriptor, DepthStencilAttachment, DeviceError, Label, MemoryRange,
-    PassTimestampWrites, Rect, RenderPassDescriptor, TextureBarrier, TextureCopy,
+    ComputePassDescriptor, DepthStencilAttachment, DeviceError, DynRayTracingPipeline, Label,
+    MemoryRange, PassTimestampWrites, RayTracingPassDescriptor, Rect, RenderPassDescriptor,
+    ShaderBindingTable, TextureBarrier, TextureCopy,
 };
+use alloc::{boxed::Box, vec::Vec};
+use core::ops::Range;
 
 use super::{
     DynAccelerationStructure, DynBindGroup, DynBuffer, DynCommandBuffer, DynComputePipeline,
@@ -211,6 +211,27 @@ pub trait DynCommandEncoder: DynResource + core::fmt::Debug {
         &mut self,
         acceleration_structure: &dyn DynAccelerationStructure,
         buf: &dyn DynBuffer,
+    );
+    unsafe fn begin_ray_tracing_pass(&mut self, desc: &RayTracingPassDescriptor<dyn DynQuerySet>);
+    unsafe fn end_ray_tracing_pass(&mut self);
+
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &dyn DynRayTracingPipeline);
+
+    unsafe fn trace_rays<'a>(
+        &mut self,
+        count: [u32; 3],
+        ray_gen_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+        ray_miss_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+        ray_hit_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+    );
+
+    unsafe fn trace_rays_indirect<'a>(
+        &mut self,
+        buffer: &dyn DynBuffer,
+        offset: wgt::BufferAddress,
+        ray_gen_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+        ray_miss_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+        ray_hit_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
     );
 }
 
@@ -704,6 +725,71 @@ impl<C: CommandEncoder + DynResource> DynCommandEncoder for C {
         let acceleration_structure = acceleration_structure.expect_downcast_ref();
         let buf = buf.expect_downcast_ref();
         unsafe { C::read_acceleration_structure_compact_size(self, acceleration_structure, buf) }
+    }
+    unsafe fn begin_ray_tracing_pass(&mut self, desc: &RayTracingPassDescriptor<dyn DynQuerySet>) {
+        let desc = RayTracingPassDescriptor {
+            label: desc.label,
+            timestamp_writes: desc
+                .timestamp_writes
+                .as_ref()
+                .map(|writes| writes.expect_downcast()),
+        };
+        unsafe { C::begin_ray_tracing_pass(self, &desc) };
+    }
+    unsafe fn end_ray_tracing_pass(&mut self) {
+        unsafe { C::end_ray_tracing_pass(self) };
+    }
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &dyn DynRayTracingPipeline) {
+        let pipeline = pipeline.expect_downcast_ref();
+        unsafe { C::set_ray_tracing_pipeline(self, pipeline) };
+    }
+
+    unsafe fn trace_rays<'a>(
+        &mut self,
+        count: [u32; 3],
+        ray_gen_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+        ray_miss_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+        ray_hit_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+    ) {
+        unsafe {
+            C::trace_rays(
+                self,
+                count,
+                ray_gen_shader_binding_table.expect_downcast::<C::A>(),
+                ray_miss_shader_binding_table.expect_downcast::<C::A>(),
+                ray_hit_shader_binding_table.expect_downcast::<C::A>(),
+            )
+        };
+    }
+
+    unsafe fn trace_rays_indirect<'a>(
+        &mut self,
+        buffer: &dyn DynBuffer,
+        offset: wgt::BufferAddress,
+        ray_gen_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+        ray_miss_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+        ray_hit_shader_binding_table: ShaderBindingTable<'a, dyn DynBuffer>,
+    ) {
+        unsafe {
+            C::trace_rays_indirect(
+                self,
+                buffer.expect_downcast_ref(),
+                offset,
+                ray_gen_shader_binding_table.expect_downcast::<C::A>(),
+                ray_miss_shader_binding_table.expect_downcast::<C::A>(),
+                ray_hit_shader_binding_table.expect_downcast::<C::A>(),
+            )
+        };
+    }
+}
+
+impl<'a> ShaderBindingTable<'a, dyn DynBuffer> {
+    pub fn expect_downcast<A: Api>(self) -> ShaderBindingTable<'a, A::Buffer> {
+        ShaderBindingTable {
+            offset: self.offset,
+            count: self.count,
+            table: self.table.expect_downcast_ref(),
+        }
     }
 }
 

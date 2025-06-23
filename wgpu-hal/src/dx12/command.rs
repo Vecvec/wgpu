@@ -14,7 +14,7 @@ use crate::{
         dxgi::{name::ObjectExt, result::HResult as _},
     },
     dx12::borrow_interface_temporarily,
-    AccelerationStructureEntries,
+    AccelerationStructureEntries, RayTracingPassDescriptor, ShaderBindingTable,
 };
 
 fn make_box(origin: &wgt::Origin3d, size: &crate::CopyExtent) -> Direct3D12::D3D12_BOX {
@@ -1667,5 +1667,41 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 conv::map_acceleration_structure_copy_mode(copy),
             )
         }
+    }
+
+    unsafe fn begin_ray_tracing_pass(
+        &mut self,
+        _desc: &RayTracingPassDescriptor<'_, super::QuerySet>,
+    ) {
+        unimplemented!()
+    }
+
+    unsafe fn end_ray_tracing_pass(&mut self) {
+        unimplemented!()
+    }
+
+    unsafe fn set_ray_tracing_pipeline(&mut self, _pipeline: &super::RayTracingPipeline) {
+        unimplemented!()
+    }
+
+    unsafe fn trace_rays(
+        &mut self,
+        _count: [u32; 3],
+        _ray_gen_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+        _ray_miss_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+        _ray_hit_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+    ) {
+        unimplemented!()
+    }
+
+    unsafe fn trace_rays_indirect(
+        &mut self,
+        _buffer: &super::Buffer,
+        _offset: wgt::BufferAddress,
+        _ray_gen_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+        _ray_miss_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+        _ray_hit_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+    ) {
+        unimplemented!()
     }
 }

@@ -311,6 +311,10 @@ pub trait CommandEncoderInterface: CommonTraits {
 
     fn begin_compute_pass(&self, desc: &crate::ComputePassDescriptor<'_>) -> DispatchComputePass;
     fn begin_render_pass(&self, desc: &crate::RenderPassDescriptor<'_>) -> DispatchRenderPass;
+    fn begin_ray_tracing_pass(
+        &self,
+        desc: &crate::RayTracingPassDescriptor<'_>,
+    ) -> DispatchRayTracingPass;
     fn finish(&mut self) -> DispatchCommandBuffer;
 
     fn clear_texture(
@@ -515,6 +519,29 @@ pub trait RenderBundleEncoderInterface: CommonTraits {
     fn finish(self, desc: &crate::RenderBundleDescriptor<'_>) -> DispatchRenderBundle
     where
         Self: Sized;
+}
+
+pub trait RayTracingPassInterface: CommonTraits {
+    fn set_pipeline(&mut self, pipeline: &DispatchRayTracingPipeline);
+    fn set_bind_group(
+        &mut self,
+        index: u32,
+        bind_group: Option<&DispatchBindGroup>,
+        offsets: &[crate::DynamicOffset],
+    );
+    fn set_push_constants(&mut self, stages: wgt::ShaderStages, offset: u32, data: &[u8]);
+
+    fn insert_debug_marker(&mut self, label: &str);
+    fn push_debug_group(&mut self, group_label: &str);
+    fn pop_debug_group(&mut self);
+
+    fn write_timestamp(&mut self, query_set: &DispatchQuerySet, query_index: u32);
+    fn begin_pipeline_statistics_query(&mut self, query_set: &DispatchQuerySet, query_index: u32);
+    fn end_pipeline_statistics_query(&mut self);
+
+    fn trace_rays(&mut self, x: u32, y: u32, z: u32);
+    fn trace_rays_indirect(&mut self, buffer: &DispatchBuffer, offset: wgt::BufferAddress);
+    fn end(&mut self);
 }
 
 pub trait CommandBufferInterface: CommonTraits {}
@@ -859,6 +886,7 @@ dispatch_types! {ref type DispatchPipelineCache: PipelineCacheInterface = CorePi
 dispatch_types! {mut type DispatchCommandEncoder: CommandEncoderInterface = CoreCommandEncoder, WebCommandEncoder, DynCommandEncoder}
 dispatch_types! {mut type DispatchComputePass: ComputePassInterface = CoreComputePass, WebComputePassEncoder, DynComputePass}
 dispatch_types! {mut type DispatchRenderPass: RenderPassInterface = CoreRenderPass, WebRenderPassEncoder, DynRenderPass}
+dispatch_types! {mut type DispatchRayTracingPass: RayTracingPassInterface = CoreRayTracingPass, WebRayTracingPassEncoder, DynRayTracingPass}
 dispatch_types! {ref type DispatchCommandBuffer: CommandBufferInterface = CoreCommandBuffer, WebCommandBuffer, DynCommandBuffer}
 dispatch_types! {mut type DispatchRenderBundleEncoder: RenderBundleEncoderInterface = CoreRenderBundleEncoder, WebRenderBundleEncoder, DynRenderBundleEncoder}
 dispatch_types! {ref type DispatchRenderBundle: RenderBundleInterface = CoreRenderBundle, WebRenderBundle, DynRenderBundle}

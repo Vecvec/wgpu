@@ -929,7 +929,7 @@ pub struct CommandEncoder {
     /// If non-`null`, the buffer is in the Vulkan "recording" state.
     active: vk::CommandBuffer,
 
-    /// What kind of pass we are currently within: compute or render.
+    /// What kind of pass we are currently within: compute, render, or ray tracing.
     bind_point: vk::PipelineBindPoint,
 
     /// Allocation recycling pool for this encoder.

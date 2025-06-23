@@ -7377,6 +7377,26 @@ impl DispatchIndirectArgs {
     }
 }
 
+/// Argument buffer layout for `trace_rays_indirect` commands.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Default, Pod, Zeroable)]
+pub struct TraceRaysIndirectArgs {
+    /// The number of rays to trace in the X dimension.
+    pub x: u32,
+    /// The number of rays to trace in the Y dimension.
+    pub y: u32,
+    /// The number of rays to trace in the Z dimension.
+    pub z: u32,
+}
+
+impl TraceRaysIndirectArgs {
+    /// Returns the bytes representation of the struct, ready to be written into a buffer.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        bytemuck::bytes_of(self)
+    }
+}
+
 /// Describes how shader bound checks should be performed.
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -1332,6 +1332,11 @@ pub struct WebRenderPassEncoder {
 }
 
 #[derive(Debug)]
+pub struct WebRayTracingPassEncoder {
+    ident: crate::cmp::Identifier,
+}
+
+#[derive(Debug)]
 pub struct WebCommandBuffer {
     pub(crate) inner: webgpu_sys::GpuCommandBuffer,
     /// Unique identifier for this CommandBuffer.
@@ -3516,6 +3521,17 @@ impl dispatch::RenderPassInterface for WebRenderPassEncoder {
 impl Drop for WebRenderPassEncoder {
     fn drop(&mut self) {
         dispatch::RenderPassInterface::end(self);
+    }
+}
+
+impl dispatch::RayTracingPassInterface for WebRayTracingPassEncoder {
+    fn end(&mut self) {
+        unimplemented!("Ray tracing unimplemented on the web!")
+    }
+}
+impl Drop for WebRayTracingPassEncoder {
+    fn drop(&mut self) {
+        // unimplemented
     }
 }
 

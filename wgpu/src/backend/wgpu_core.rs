@@ -643,6 +643,14 @@ pub struct CoreRenderPass {
 }
 
 #[derive(Debug)]
+pub struct CoreRayTracingPass {
+    pub(crate) context: ContextWgpuCore,
+    pass: wgc::command::RayTracingPass,
+    error_sink: ErrorSink,
+    id: crate::cmp::Identifier,
+}
+
+#[derive(Debug)]
 pub struct CoreCommandEncoder {
     pub(crate) context: ContextWgpuCore,
     id: wgc::id::CommandEncoderId,
@@ -807,6 +815,7 @@ crate::cmp::impl_eq_ord_hash_proxy!(CorePipelineCache => .id);
 crate::cmp::impl_eq_ord_hash_proxy!(CoreCommandEncoder => .id);
 crate::cmp::impl_eq_ord_hash_proxy!(CoreComputePass => .id);
 crate::cmp::impl_eq_ord_hash_proxy!(CoreRenderPass => .id);
+crate::cmp::impl_eq_ord_hash_proxy!(CoreRayTracingPass => .id);
 crate::cmp::impl_eq_ord_hash_proxy!(CoreCommandBuffer => .id);
 crate::cmp::impl_eq_ord_hash_proxy!(CoreRenderBundleEncoder => .id);
 crate::cmp::impl_eq_ord_hash_proxy!(CoreRenderBundle => .id);
@@ -2591,6 +2600,45 @@ impl dispatch::CommandEncoderInterface for CoreCommandEncoder {
         .into()
     }
 
+    fn begin_ray_tracing_pass(
+        &self,
+        desc: &crate::RayTracingPassDescriptor<'_>,
+    ) -> dispatch::DispatchRayTracingPass {
+        let timestamp_writes =
+            desc.timestamp_writes
+                .as_ref()
+                .map(|tw| wgc::command::PassTimestampWrites {
+                    query_set: tw.query_set.inner.as_core().id,
+                    beginning_of_pass_write_index: tw.beginning_of_pass_write_index,
+                    end_of_pass_write_index: tw.end_of_pass_write_index,
+                });
+
+        let (pass, err) = self.context.0.command_encoder_begin_ray_tracing_pass(
+            self.id,
+            &wgc::command::RayTracingPassDescriptor {
+                label: desc.label.map(Borrowed),
+                timestamp_writes,
+            },
+        );
+
+        if let Some(cause) = err {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                desc.label,
+                "CommandEncoder::begin_ray_tracing_pass",
+            );
+        }
+
+        CoreRayTracingPass {
+            context: self.context.clone(),
+            pass,
+            error_sink: self.error_sink.clone(),
+            id: crate::cmp::Identifier::create(),
+        }
+        .into()
+    }
+
     fn finish(&mut self) -> dispatch::DispatchCommandBuffer {
         let descriptor = wgt::CommandBufferDescriptor::default();
         self.open = false; // prevent the drop
@@ -3591,6 +3639,217 @@ impl dispatch::RenderPassInterface for CoreRenderPass {
 impl Drop for CoreRenderPass {
     fn drop(&mut self) {
         dispatch::RenderPassInterface::end(self);
+    }
+}
+
+impl dispatch::RayTracingPassInterface for CoreRayTracingPass {
+    fn set_pipeline(&mut self, pipeline: &dispatch::DispatchRayTracingPipeline) {
+        let pipeline = pipeline.as_core();
+
+        if let Err(cause) = self
+            .context
+            .0
+            .ray_tracing_pass_set_pipeline(&mut self.pass, pipeline.id)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::set_pipeline",
+            );
+        }
+    }
+
+    fn set_bind_group(
+        &mut self,
+        index: u32,
+        bind_group: Option<&dispatch::DispatchBindGroup>,
+        offsets: &[crate::DynamicOffset],
+    ) {
+        let bg = bind_group.map(|bg| bg.as_core().id);
+
+        if let Err(cause) =
+            self.context
+                .0
+                .ray_tracing_pass_set_bind_group(&mut self.pass, index, bg, offsets)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::set_bind_group",
+            );
+        }
+    }
+
+    fn set_push_constants(&mut self, stages: wgt::ShaderStages, offset: u32, data: &[u8]) {
+        if let Err(cause) =
+            self.context
+                .0
+                .ray_tracing_pass_set_push_constants(&mut self.pass, stages, offset, data)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::set_push_constant",
+            );
+        }
+    }
+
+    fn insert_debug_marker(&mut self, label: &str) {
+        if let Err(cause) =
+            self.context
+                .0
+                .ray_tracing_pass_insert_debug_marker(&mut self.pass, label, 0)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::insert_debug_marker",
+            );
+        }
+    }
+
+    fn push_debug_group(&mut self, group_label: &str) {
+        if let Err(cause) =
+            self.context
+                .0
+                .ray_tracing_pass_push_debug_group(&mut self.pass, group_label, 0)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::push_debug_group",
+            );
+        }
+    }
+
+    fn pop_debug_group(&mut self) {
+        if let Err(cause) = self
+            .context
+            .0
+            .ray_tracing_pass_pop_debug_group(&mut self.pass)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::pop_debug_group",
+            );
+        }
+    }
+
+    fn write_timestamp(&mut self, query_set: &dispatch::DispatchQuerySet, query_index: u32) {
+        let query_set = query_set.as_core();
+
+        if let Err(cause) = self.context.0.ray_tracing_pass_write_timestamp(
+            &mut self.pass,
+            query_set.id,
+            query_index,
+        ) {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::write_timestamp",
+            );
+        }
+    }
+
+    fn begin_pipeline_statistics_query(
+        &mut self,
+        query_set: &dispatch::DispatchQuerySet,
+        query_index: u32,
+    ) {
+        let query_set = query_set.as_core();
+
+        if let Err(cause) = self
+            .context
+            .0
+            .ray_tracing_pass_begin_pipeline_statistics_query(
+                &mut self.pass,
+                query_set.id,
+                query_index,
+            )
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::begin_pipeline_statistics_query",
+            );
+        }
+    }
+
+    fn end_pipeline_statistics_query(&mut self) {
+        if let Err(cause) = self
+            .context
+            .0
+            .ray_tracing_pass_end_pipeline_statistics_query(&mut self.pass)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::end_pipeline_statistics_query",
+            );
+        }
+    }
+
+    fn trace_rays(&mut self, x: u32, y: u32, z: u32) {
+        if let Err(cause) = self
+            .context
+            .0
+            .ray_tracing_pass_trace_rays(&mut self.pass, x, y, z)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::trace_rays",
+            );
+        }
+    }
+
+    fn trace_rays_indirect(
+        &mut self,
+        buffer: &dispatch::DispatchBuffer,
+        offset: wgt::BufferAddress,
+    ) {
+        let buffer = buffer.as_core();
+
+        if let Err(cause) =
+            self.context
+                .0
+                .ray_tracing_pass_trace_rays_indirect(&mut self.pass, buffer.id, offset)
+        {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::trace_rays",
+            );
+        }
+    }
+
+    fn end(&mut self) {
+        if let Err(cause) = self.context.0.ray_tracing_pass_end(&mut self.pass) {
+            self.context.handle_error(
+                &self.error_sink,
+                cause,
+                self.pass.label(),
+                "RayTracingPass::end",
+            );
+        }
+    }
+}
+
+impl Drop for CoreRayTracingPass {
+    fn drop(&mut self) {
+        dispatch::RayTracingPassInterface::end(self);
     }
 }
 

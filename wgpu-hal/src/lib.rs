@@ -238,12 +238,11 @@
     unused_qualifications
 )]
 
-extern crate alloc;
-extern crate wgpu_types as wgt;
-// Each of these backends needs `std` in some fashion; usually `std::thread` functions.
+extern crate alloc; // Each of these backends needs `std` in some fashion; usually `std::thread` functions.
 #[cfg(any(dx12, gles_with_std, metal, vulkan))]
 #[macro_use]
 extern crate std;
+extern crate wgpu_types as wgt;
 
 /// DirectX12 API internals.
 #[cfg(dx12)]
@@ -1605,6 +1604,30 @@ pub trait CommandEncoder: WasmNotSendSync + fmt::Debug {
         acceleration_structure: &<Self::A as Api>::AccelerationStructure,
         buf: &<Self::A as Api>::Buffer,
     );
+    // ray tracing pass
+    unsafe fn begin_ray_tracing_pass(
+        &mut self,
+        desc: &RayTracingPassDescriptor<'_, <Self::A as Api>::QuerySet>,
+    );
+    unsafe fn end_ray_tracing_pass(&mut self);
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &<Self::A as Api>::RayTracingPipeline);
+
+    unsafe fn trace_rays<'a>(
+        &mut self,
+        count: [u32; 3],
+        ray_gen_shader_binding_table: ShaderBindingTable<'a, <Self::A as Api>::Buffer>,
+        ray_miss_shader_binding_table: ShaderBindingTable<'a, <Self::A as Api>::Buffer>,
+        ray_hit_shader_binding_table: ShaderBindingTable<'a, <Self::A as Api>::Buffer>,
+    );
+
+    unsafe fn trace_rays_indirect<'a>(
+        &mut self,
+        buffer: &<Self::A as Api>::Buffer,
+        offset: wgt::BufferAddress,
+        ray_gen_shader_binding_table: ShaderBindingTable<'a, <Self::A as Api>::Buffer>,
+        ray_miss_shader_binding_table: ShaderBindingTable<'a, <Self::A as Api>::Buffer>,
+        ray_hit_shader_binding_table: ShaderBindingTable<'a, <Self::A as Api>::Buffer>,
+    );
 }
 
 bitflags!(
@@ -2237,6 +2260,15 @@ pub struct ShaderBindingData {
     pub data: Vec<u8>,
 }
 
+pub struct ShaderBindingTable<'a, B: DynBuffer + ?Sized> {
+    /// The offset into the data for the shader binding(s)
+    pub offset: wgt::BufferAddress,
+    /// The number of shader bindings
+    pub count: u32,
+    /// The buffer for the shader binding(s)
+    pub table: &'a B,
+}
+
 pub struct PipelineCacheDescriptor<'a> {
     pub label: Label<'a>,
     pub data: Option<&'a [u8]>,
@@ -2444,6 +2476,12 @@ pub struct RenderPassDescriptor<'a, Q: DynQuerySet + ?Sized, T: DynTextureView +
 
 #[derive(Clone, Debug)]
 pub struct ComputePassDescriptor<'a, Q: DynQuerySet + ?Sized> {
+    pub label: Label<'a>,
+    pub timestamp_writes: Option<PassTimestampWrites<'a, Q>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct RayTracingPassDescriptor<'a, Q: DynQuerySet + ?Sized> {
     pub label: Label<'a>,
     pub timestamp_writes: Option<PassTimestampWrites<'a, Q>>,
 }

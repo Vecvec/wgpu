@@ -660,7 +660,6 @@ pub struct ShaderBindingData {
     pub(crate) ray_hit_size: wgt::BufferSize,
 }
 
-#[expect(dead_code)]
 #[derive(Debug)]
 pub struct RayTracingPipeline {
     pub(crate) raw: ManuallyDrop<Box<dyn hal::DynRayTracingPipeline>>,
@@ -699,7 +698,6 @@ crate::impl_storage_item!(RayTracingPipeline);
 crate::impl_trackable!(RayTracingPipeline);
 
 impl RayTracingPipeline {
-    #[expect(dead_code)]
     pub(crate) fn raw(&self) -> &dyn hal::DynRayTracingPipeline {
         self.raw.as_ref()
     }

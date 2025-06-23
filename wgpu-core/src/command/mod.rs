@@ -9,6 +9,7 @@ mod memory_init;
 mod pass;
 mod query;
 mod ray_tracing;
+mod ray_tracing_command;
 mod render;
 mod render_command;
 mod timestamp_writes;
@@ -22,7 +23,7 @@ use core::ops;
 pub(crate) use self::clear::clear_texture;
 pub use self::{
     bundle::*, clear::ClearError, compute::*, compute_command::ComputeCommand, draw::*, query::*,
-    render::*, render_command::RenderCommand, transfer::*,
+    ray_tracing::*, render::*, render_command::RenderCommand, transfer::*,
 };
 pub(crate) use allocator::CommandAllocator;
 
@@ -1216,6 +1217,8 @@ pub enum PassErrorScope {
     SetPipelineRender,
     #[error("In a set_pipeline command")]
     SetPipelineCompute,
+    #[error("In a set_pipeline command")]
+    SetPipelineRayTracing,
     #[error("In a set_push_constant command")]
     SetPushConstant,
     #[error("In a set_vertex_buffer command")]
@@ -1252,4 +1255,6 @@ pub enum PassErrorScope {
     PopDebugGroup,
     #[error("In a insert_debug_marker command")]
     InsertDebugMarker,
+    #[error("In a trace rays command, indirect:{indirect}")]
+    TraceRays { indirect: bool },
 }

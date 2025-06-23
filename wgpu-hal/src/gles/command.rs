@@ -1,9 +1,9 @@
 use alloc::string::String;
 use core::{mem, ops::Range};
 
-use arrayvec::ArrayVec;
-
 use super::{conv, Command as C};
+use crate::{RayTracingPassDescriptor, ShaderBindingTable};
+use arrayvec::ArrayVec;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct TextureSlotDesc {
@@ -1264,6 +1264,42 @@ impl crate::CommandEncoder for super::CommandEncoder {
         &mut self,
         _acceleration_structure: &super::AccelerationStructure,
         _buf: &super::Buffer,
+    ) {
+        unimplemented!()
+    }
+
+    unsafe fn begin_ray_tracing_pass(
+        &mut self,
+        _desc: &RayTracingPassDescriptor<'_, super::QuerySet>,
+    ) {
+        unimplemented!()
+    }
+
+    unsafe fn end_ray_tracing_pass(&mut self) {
+        unimplemented!()
+    }
+
+    unsafe fn set_ray_tracing_pipeline(&mut self, _pipeline: &super::RayTracingPipeline) {
+        unimplemented!()
+    }
+
+    unsafe fn trace_rays(
+        &mut self,
+        _count: [u32; 3],
+        _ray_gen_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+        _ray_miss_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+        _ray_hit_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+    ) {
+        unimplemented!()
+    }
+
+    unsafe fn trace_rays_indirect(
+        &mut self,
+        _buffer: &super::Buffer,
+        _offset: wgt::BufferAddress,
+        _ray_gen_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+        _ray_miss_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
+        _ray_hit_shader_binding_table: ShaderBindingTable<'_, super::Buffer>,
     ) {
         unimplemented!()
     }

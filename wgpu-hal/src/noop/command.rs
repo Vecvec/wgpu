@@ -1,8 +1,8 @@
+use super::{Api, Buffer, DeviceResult, Resource};
+use crate::{RayTracingPassDescriptor, ShaderBindingTable};
 use alloc::vec::Vec;
 use core::mem;
 use core::ops::Range;
-
-use super::{Api, Buffer, DeviceResult, Resource};
 
 /// Command buffer type, which performs double duty as the command encoder type too.
 #[derive(Debug)]
@@ -298,6 +298,31 @@ impl crate::CommandEncoder for CommandBuffer {
         src: &Resource,
         dst: &Resource,
         copy: wgt::AccelerationStructureCopy,
+    ) {
+    }
+
+    unsafe fn begin_ray_tracing_pass(&mut self, desc: &RayTracingPassDescriptor<'_, Resource>) {}
+
+    unsafe fn end_ray_tracing_pass(&mut self) {}
+
+    unsafe fn set_ray_tracing_pipeline(&mut self, pipeline: &Resource) {}
+
+    unsafe fn trace_rays<'a>(
+        &mut self,
+        count: [u32; 3],
+        ray_gen_shader_binding_table: ShaderBindingTable<'a, Buffer>,
+        ray_miss_shader_binding_table: ShaderBindingTable<'a, Buffer>,
+        ray_hit_shader_binding_table: ShaderBindingTable<'a, Buffer>,
+    ) {
+    }
+
+    unsafe fn trace_rays_indirect<'a>(
+        &mut self,
+        bufffer: &Buffer,
+        offset: wgt::BufferAddress,
+        ray_gen_shader_binding_table: ShaderBindingTable<'a, Buffer>,
+        ray_miss_shader_binding_table: ShaderBindingTable<'a, Buffer>,
+        ray_hit_shader_binding_table: ShaderBindingTable<'a, Buffer>,
     ) {
     }
 }
