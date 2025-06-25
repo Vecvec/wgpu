@@ -73,6 +73,8 @@ impl crate::Api for Api {
     type PipelineCache = PipelineCache;
 
     type AccelerationStructure = AccelerationStructure;
+
+    type RayTracingPipeline = RayTracingPipeline;
 }
 
 crate::impl_dyn_resource!(
@@ -91,6 +93,7 @@ crate::impl_dyn_resource!(
     PipelineLayout,
     QuerySet,
     Queue,
+    RayTracingPipeline,
     RenderPipeline,
     Sampler,
     ShaderModule,
@@ -1012,3 +1015,8 @@ impl crate::DynPipelineCache for PipelineCache {}
 pub struct AccelerationStructure;
 
 impl crate::DynAccelerationStructure for AccelerationStructure {}
+
+#[derive(Debug)]
+pub struct RayTracingPipeline;
+
+impl crate::DynRayTracingPipeline for RayTracingPipeline {}

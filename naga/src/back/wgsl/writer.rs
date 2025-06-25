@@ -34,7 +34,7 @@ enum Attribute {
     Stage(ShaderStage),
     WorkGroupSize([u32; 3]),
     PayloadType(Handle<crate::Type>),
-    IncomingPayload(Handle<crate::GlobalVariable>)
+    IncomingPayload(Handle<crate::GlobalVariable>),
 }
 
 /// The WGSL form that `write_expr_with_indirection` should use to render a Naga
@@ -192,8 +192,7 @@ impl<W: Write> Writer<W> {
                     Attribute::Stage(ShaderStage::Compute),
                     Attribute::WorkGroupSize(ep.workgroup_size),
                 ],
-                ShaderStage::Task
-                | ShaderStage::Mesh => unreachable!(),
+                ShaderStage::Task | ShaderStage::Mesh => unreachable!(),
                 ShaderStage::RayGeneration => {
                     let mut attributes = vec![Attribute::Stage(ShaderStage::RayGeneration)];
                     if let Some(payload_ty) = ep.payload_type_handle {
@@ -206,12 +205,16 @@ impl<W: Write> Writer<W> {
                     if let Some(payload_ty) = ep.payload_type_handle {
                         attributes.push(Attribute::PayloadType(payload_ty));
                     }
-                    attributes.push(Attribute::IncomingPayload(ep.incoming_payload_handle.expect("This must be set")));
+                    attributes.push(Attribute::IncomingPayload(
+                        ep.incoming_payload_handle.expect("This must be set"),
+                    ));
                     attributes
                 }
                 ShaderStage::RayAnyHit => {
                     let mut attributes = vec![Attribute::Stage(ep.stage)];
-                    attributes.push(Attribute::IncomingPayload(ep.incoming_payload_handle.expect("This must be set")));
+                    attributes.push(Attribute::IncomingPayload(
+                        ep.incoming_payload_handle.expect("This must be set"),
+                    ));
                     attributes
                 }
             };
@@ -413,8 +416,7 @@ impl<W: Write> Writer<W> {
                         ShaderStage::RayClosestHit => "ray_closest_hit",
                         ShaderStage::RayAnyHit => "ray_any_hit",
                         ShaderStage::RayMiss => "ray_miss",
-                        ShaderStage::Task
-                        | ShaderStage::Mesh => unreachable!(),
+                        ShaderStage::Task | ShaderStage::Mesh => unreachable!(),
                     };
                     write!(self.out, "@{stage_str} ")?;
                 }
@@ -1013,7 +1015,11 @@ impl<W: Write> Writer<W> {
             Statement::RayTracing(ref func) => {
                 write!(self.out, "{level}")?;
                 match *func {
-                    RayTracingFunction::TraceRay { acceleration_structure, descriptor, payload } => {
+                    RayTracingFunction::TraceRay {
+                        acceleration_structure,
+                        descriptor,
+                        payload,
+                    } => {
                         write!(self.out, "traceRays(")?;
                         self.write_expr(module, acceleration_structure, func_ctx)?;
                         write!(self.out, ", ")?;
@@ -1751,11 +1757,12 @@ impl<W: Write> Writer<W> {
     ) -> BackendResult {
         // Write group and binding attributes if present
         if let Some(ref binding) = global.binding {
-            self.write_attributes(&[
-                            Attribute::Group(binding.group),
-                            Attribute::Binding(binding.binding),
-                        ],
-                                  module,
+            self.write_attributes(
+                &[
+                    Attribute::Group(binding.group),
+                    Attribute::Binding(binding.binding),
+                ],
+                module,
             )?;
             writeln!(self.out)?;
         }

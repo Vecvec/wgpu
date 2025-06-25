@@ -7,7 +7,9 @@ use parking_lot::Mutex;
 use super::{conv, PassthroughShader};
 use crate::auxil::map_naga_stage;
 use crate::metal::ShaderModuleSource;
-use crate::TlasInstance;
+use crate::{
+    DeviceError, PipelineError, RayTracingPipelineDescriptor, ShaderBindingData, TlasInstance,
+};
 
 use metal::{
     foreign_types::ForeignType, MTLCommandBufferStatus, MTLDepthClipMode, MTLLanguageVersion,
@@ -1604,6 +1606,28 @@ impl crate::Device for super::Device {
     }
 
     fn tlas_instance_to_bytes(&self, _instance: TlasInstance) -> Vec<u8> {
+        unimplemented!()
+    }
+
+    unsafe fn create_ray_tracing_pipeline(
+        &self,
+        desc: &RayTracingPipelineDescriptor<
+            super::PipelineLayout,
+            super::ShaderModule,
+            super::PipelineCache,
+        >,
+    ) -> Result<super::RayTracingPipeline, PipelineError> {
+        unimplemented!()
+    }
+
+    unsafe fn destroy_ray_tracing_pipeline(&self, pipeline: super::RayTracingPipeline) {
+        unimplemented!()
+    }
+
+    unsafe fn get_shader_binding_data(
+        &self,
+        pipeline: &super::RayTracingPipeline,
+    ) -> Result<ShaderBindingData, DeviceError> {
         unimplemented!()
     }
 

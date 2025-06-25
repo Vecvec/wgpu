@@ -1023,9 +1023,8 @@ impl Global {
         let bytes = label.as_bytes();
         base.string_data.extend_from_slice(bytes);
 
-        base.commands.push(ArcRayTracingCommand::PushDebugGroup {
-            len: bytes.len(),
-        });
+        base.commands
+            .push(ArcRayTracingCommand::PushDebugGroup { len: bytes.len() });
 
         Ok(())
     }
@@ -1052,9 +1051,8 @@ impl Global {
         let bytes = label.as_bytes();
         base.string_data.extend_from_slice(bytes);
 
-        base.commands.push(ArcRayTracingCommand::InsertDebugMarker {
-            len: bytes.len(),
-        });
+        base.commands
+            .push(ArcRayTracingCommand::InsertDebugMarker { len: bytes.len() });
 
         Ok(())
     }
