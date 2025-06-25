@@ -180,6 +180,21 @@ impl TryToWgsl for crate::BuiltIn {
             Bi::SubgroupId => "subgroup_id",
             Bi::SubgroupSize => "subgroup_size",
             Bi::SubgroupInvocationId => "subgroup_invocation_id",
+            Bi::RayLaunchId => "ray_launch_id",
+            Bi::RayLaunchSize => "ray_launch_size",
+            Bi::WorldRayOrigin => "world_ray_origin",
+            Bi::WorldRayDirection => "world_ray_direction",
+            Bi::TMin => "t_min",
+            Bi::TMax => "t_max",
+            Bi::T => "t",
+            Bi::ObjectRayOrigin => "object_ray_origin",
+            Bi::ObjectRayDirection => "object_ray_direction",
+            Bi::ObjectToWorld => "object_to_world",
+            Bi::WorldToObject => "world_to_object",
+            Bi::InstanceCustomData => "instance_custom_data",
+            Bi::HitKind => "hit_kind",
+            Bi::IncomingFlags => "incoming_flags",
+            Bi::GeometryIndex => "geometry_index",
 
             // Non-standard built-ins.
             Bi::BaseInstance
@@ -188,22 +203,7 @@ impl TryToWgsl for crate::BuiltIn {
             | Bi::PointSize
             | Bi::DrawID
             | Bi::PointCoord
-            | Bi::WorkGroupSize
-            | Bi::RayLaunchId
-            | Bi::RayLaunchSize
-            | Bi::WorldRayOrigin
-            | Bi::WorldRayDirection
-            | Bi::TMin
-            | Bi::TMax
-            | Bi::T
-            | Bi::ObjectRayOrigin
-            | Bi::ObjectRayDirection
-            | Bi::ObjectToWorld
-            | Bi::WorldToObject
-            | Bi::InstanceCustomData
-            | Bi::HitKind
-            | Bi::IncomingFlags
-            | Bi::GeometryIndex => return None,
+            | Bi::WorkGroupSize => return None,
         })
     }
 }

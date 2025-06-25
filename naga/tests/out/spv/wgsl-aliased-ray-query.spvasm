@@ -5,6 +5,7 @@
 OpCapability Shader
 OpCapability RayQueryKHR
 OpExtension "SPV_KHR_ray_query"
+OpExtension "SPV_KHR_ray_tracing"
 %1 = OpExtInstImport "GLSL.std.450"
 OpMemoryModel Logical GLSL450
 OpEntryPoint GLCompute %16 "main_candidate" %13
