@@ -4,13 +4,184 @@ Generating SPIR-V for ray query operations.
 
 use alloc::vec;
 
-use super::{
-    Block, BlockContext, Function, FunctionArgument, Instruction, LookupFunctionType, NumericType,
-    Writer,
-};
+use super::{Block, BlockContext, Function, FunctionArgument, Instruction, LocalType, LookupFunctionType, LookupType, NumericType, Writer};
 use crate::arena::Handle;
 
 impl Writer {
+    pub(super) fn write_recursion_storage(&mut self) -> spirv::Word {
+        if let Some(recursion_counter) = self.recursion_counter {
+            return recursion_counter;
+        }
+        let type_id = self.get_u32_type_id();
+        let pointer_type_id = self.id_gen.next();
+        Instruction::type_pointer(pointer_type_id, spirv::StorageClass::Private, type_id)
+            .to_words(&mut self.logical_layout.declarations);
+
+        let init_word = self.get_constant_scalar(crate::Literal::U32(0));
+
+        let id = self.id_gen.next();
+        Instruction::variable(pointer_type_id, id, spirv::StorageClass::Private, Some(init_word))
+            .to_words(&mut self.logical_layout.declarations);
+
+        self.recursion_counter = Some(id);
+        id
+    }
+
+    pub(super) fn write_trace_ray_function(&mut self, ir_module: &crate::Module, payload: Handle<crate::GlobalVariable>) -> spirv::Word {
+        if let Some(func_id) = self.trace_ray_function.get(&payload) {
+            return *func_id;
+        }
+
+        let acceleration_structure_ty_id = self.get_type_id(LookupType::Local(LocalType::AccelerationStructure));
+
+        let ray_desc_type_id = self.get_handle_type_id(ir_module.special_types.ray_desc.expect("should be populated by trace_ray function"));
+
+        let func_ty = self.get_function_type(LookupFunctionType {
+            parameter_type_ids: vec![acceleration_structure_ty_id, ray_desc_type_id],
+            return_type_id: self.void_type,
+        });
+
+        let mut function = Function::default();
+        let func_id = self.id_gen.next();
+        function.signature = Some(Instruction::function(
+            self.void_type,
+            func_id,
+            spirv::FunctionControl::empty(),
+            func_ty,
+        ));
+
+        let acceleration_struct_id = self.id_gen.next();
+        let instruction = Instruction::function_parameter(acceleration_structure_ty_id, acceleration_struct_id);
+        function.parameters.push(FunctionArgument {
+            instruction,
+            handle_id: 0,
+        });
+
+        let ray_desc_id = self.id_gen.next();
+        let instruction = Instruction::function_parameter(ray_desc_type_id, ray_desc_id);
+        function.parameters.push(FunctionArgument {
+            instruction,
+            handle_id: 1,
+        });
+
+        let label_id = self.id_gen.next();
+        let mut block = Block::new(label_id);
+
+        let below_recursion_comp_id = self.id_gen.next();
+        let max_recursion_id =
+            self.get_constant_scalar(crate::Literal::U32(self.maximum_ray_tracing_recursion_depth));
+        let recursion_storage = self.id_gen.next();
+
+        block.body.push(Instruction::load(self.get_u32_type_id(), recursion_storage, self.write_recursion_storage(), None));
+
+        block.body.push(Instruction::binary(
+            spirv::Op::ULessThan,
+            self.get_bool_type_id(),
+            below_recursion_comp_id,
+            recursion_storage,
+            max_recursion_id,
+        ));
+
+        let below_recursion_label_id = self.id_gen.next();
+        let mut below_recursion_block = Block::new(below_recursion_label_id);
+
+        let final_label_id = self.id_gen.next();
+        let final_block = Block::new(final_label_id);
+
+        block.body.push(Instruction::selection_merge(
+            final_label_id,
+            spirv::SelectionControl::NONE,
+        ));
+        function.consume(
+            block,
+            Instruction::branch_conditional(below_recursion_comp_id, below_recursion_label_id, final_label_id),
+        );
+
+        //Note: composite extract indices and types must match `generate_ray_desc_type`
+        let flag_type_id =
+            self.get_numeric_type_id(NumericType::Scalar(crate::Scalar::U32));
+        let ray_flags_id = self.id_gen.next();
+        below_recursion_block.body.push(Instruction::composite_extract(
+            flag_type_id,
+            ray_flags_id,
+            ray_desc_id,
+            &[0],
+        ));
+        let cull_mask_id = self.id_gen.next();
+        below_recursion_block.body.push(Instruction::composite_extract(
+            flag_type_id,
+            cull_mask_id,
+            ray_desc_id,
+            &[1],
+        ));
+
+        let scalar_type_id =
+            self.get_numeric_type_id(NumericType::Scalar(crate::Scalar::F32));
+        let tmin_id = self.id_gen.next();
+        below_recursion_block.body.push(Instruction::composite_extract(
+            scalar_type_id,
+            tmin_id,
+            ray_desc_id,
+            &[2],
+        ));
+        let tmax_id = self.id_gen.next();
+        below_recursion_block.body.push(Instruction::composite_extract(
+            scalar_type_id,
+            tmax_id,
+            ray_desc_id,
+            &[3],
+        ));
+
+        let vector_type_id = self.get_numeric_type_id(NumericType::Vector {
+            size: crate::VectorSize::Tri,
+            scalar: crate::Scalar::F32,
+        });
+        let ray_origin_id = self.id_gen.next();
+        below_recursion_block.body.push(Instruction::composite_extract(
+            vector_type_id,
+            ray_origin_id,
+            ray_desc_id,
+            &[4],
+        ));
+        let ray_dir_id = self.id_gen.next();
+        below_recursion_block.body.push(Instruction::composite_extract(
+            vector_type_id,
+            ray_dir_id,
+            ray_desc_id,
+            &[5],
+        ));
+
+        let sbt_offset = self.get_constant_scalar(crate::Literal::I32(0));
+        let miss_idx = self.get_constant_scalar(crate::Literal::I32(0));
+        let sbt_stride = self.get_constant_scalar(crate::Literal::I32(1));
+
+        let payload_id = self.global_variables.get(payload).expect("Cannot be passed into function without existing");
+
+        below_recursion_block.body.push(Instruction::trace_rays(
+            acceleration_struct_id,
+            ray_flags_id,
+            cull_mask_id,
+            sbt_offset,
+            sbt_stride,
+            miss_idx,
+            ray_origin_id,
+            tmin_id,
+            ray_dir_id,
+            tmax_id,
+            payload_id.var_id,
+        ));
+
+
+        function.consume(below_recursion_block, Instruction::branch(final_label_id));
+        function.consume(final_block, Instruction::return_void());
+
+        function.to_words(&mut self.logical_layout.function_definitions);
+
+        self.trace_ray_function.insert(payload, func_id);
+
+        func_id
+    }
+
     pub(super) fn write_ray_query_get_intersection_function(
         &mut self,
         is_committed: bool,
@@ -568,86 +739,19 @@ impl BlockContext<'_> {
                 descriptor,
                 payload,
             } => {
-                let payload_id = match self.ir_function.expressions[payload] {
+                let payload_handle = match self.ir_function.expressions[payload] {
                     crate::Expression::GlobalVariable(global) => {
-                        self.writer.global_variables[global].var_id
+                        global
                     }
                     _ => unreachable!("payload must be a pointer to a global variable"),
                 };
-                //Note: composite extract indices and types must match `generate_ray_desc_type`
                 let desc_id = self.cached[descriptor];
                 let acc_struct_id = self.get_handle_id(acceleration_structure);
 
-                let flag_type_id =
-                    self.get_numeric_type_id(NumericType::Scalar(crate::Scalar::U32));
-                let ray_flags_id = self.gen_id();
-                block.body.push(Instruction::composite_extract(
-                    flag_type_id,
-                    ray_flags_id,
-                    desc_id,
-                    &[0],
-                ));
-                let cull_mask_id = self.gen_id();
-                block.body.push(Instruction::composite_extract(
-                    flag_type_id,
-                    cull_mask_id,
-                    desc_id,
-                    &[1],
-                ));
+                let func_id = self.writer.write_trace_ray_function(self.ir_module, payload_handle);
 
-                let scalar_type_id =
-                    self.get_numeric_type_id(NumericType::Scalar(crate::Scalar::F32));
-                let tmin_id = self.gen_id();
-                block.body.push(Instruction::composite_extract(
-                    scalar_type_id,
-                    tmin_id,
-                    desc_id,
-                    &[2],
-                ));
-                let tmax_id = self.gen_id();
-                block.body.push(Instruction::composite_extract(
-                    scalar_type_id,
-                    tmax_id,
-                    desc_id,
-                    &[3],
-                ));
-
-                let vector_type_id = self.get_numeric_type_id(NumericType::Vector {
-                    size: crate::VectorSize::Tri,
-                    scalar: crate::Scalar::F32,
-                });
-                let ray_origin_id = self.gen_id();
-                block.body.push(Instruction::composite_extract(
-                    vector_type_id,
-                    ray_origin_id,
-                    desc_id,
-                    &[4],
-                ));
-                let ray_dir_id = self.gen_id();
-                block.body.push(Instruction::composite_extract(
-                    vector_type_id,
-                    ray_dir_id,
-                    desc_id,
-                    &[5],
-                ));
-
-                let sbt_offset = self.writer.get_constant_scalar(crate::Literal::I32(0));
-                let miss_idx = self.writer.get_constant_scalar(crate::Literal::I32(0));
-                let sbt_stride = self.writer.get_constant_scalar(crate::Literal::I32(1));
-
-                block.body.push(Instruction::trace_rays(
-                    acc_struct_id,
-                    ray_flags_id,
-                    cull_mask_id,
-                    sbt_offset,
-                    sbt_stride,
-                    miss_idx,
-                    ray_origin_id,
-                    tmin_id,
-                    ray_dir_id,
-                    tmax_id,
-                    payload_id,
-                ));
+                let call_id = self.gen_id();
+                block.body.push(Instruction::function_call(self.writer.void_type, call_id, func_id, &[acc_struct_id, desc_id]));
             }
         }
     }

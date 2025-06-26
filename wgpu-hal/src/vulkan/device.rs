@@ -847,6 +847,7 @@ impl super::Device {
         stage: &crate::ProgrammableStage<super::ShaderModule>,
         naga_stage: naga::ShaderStage,
         binding_map: &naga::back::spv::BindingMap,
+        max_ray_pipeline_recursion_depth: u32,
     ) -> Result<CompiledStage, crate::PipelineError> {
         let stage_flags = crate::auxil::map_naga_stage(naga_stage);
         let vk_module = match *stage.module {
@@ -858,6 +859,7 @@ impl super::Device {
                 let pipeline_options = naga::back::spv::PipelineOptions {
                     entry_point: stage.entry_point.to_owned(),
                     shader_stage: naga_stage,
+                    max_ray_pipeline_recursion_depth,
                 };
                 let needs_temp_options = !runtime_checks.bounds_checks
                     || !runtime_checks.force_loop_bounding
@@ -1987,6 +1989,7 @@ impl crate::Device for super::Device {
             &desc.vertex_stage,
             naga::ShaderStage::Vertex,
             &desc.layout.binding_arrays,
+            0,
         )?;
         stages.push(compiled_vs.create_info);
         let compiled_fs = match desc.fragment_stage {
@@ -1995,6 +1998,7 @@ impl crate::Device for super::Device {
                     stage,
                     naga::ShaderStage::Fragment,
                     &desc.layout.binding_arrays,
+                    0,
                 )?;
                 stages.push(compiled.create_info);
                 Some(compiled)
@@ -2197,6 +2201,7 @@ impl crate::Device for super::Device {
                     stage,
                     naga::ShaderStage::Task,
                     &desc.layout.binding_arrays,
+                    0,
                 )?;
                 compiled.create_info.stage = vk::ShaderStageFlags::TASK_EXT;
                 stages.push(compiled.create_info);
@@ -2209,6 +2214,7 @@ impl crate::Device for super::Device {
             &desc.mesh_stage,
             naga::ShaderStage::Mesh,
             &desc.layout.binding_arrays,
+            0,
         )?;
         compiled_ms.create_info.stage = vk::ShaderStageFlags::MESH_EXT;
         stages.push(compiled_ms.create_info);
@@ -2218,6 +2224,7 @@ impl crate::Device for super::Device {
                     stage,
                     naga::ShaderStage::Fragment,
                     &desc.layout.binding_arrays,
+                    0,
                 )?;
                 stages.push(compiled.create_info);
                 Some(compiled)
@@ -2414,6 +2421,7 @@ impl crate::Device for super::Device {
             &desc.stage,
             naga::ShaderStage::Compute,
             &desc.layout.binding_arrays,
+            0,
         )?;
 
         let vk_infos = [{
@@ -2480,6 +2488,7 @@ impl crate::Device for super::Device {
             &desc.ray_generation_stage,
             naga::ShaderStage::RayGeneration,
             &desc.layout.binding_arrays,
+            desc.max_recursion_depth,
         )?;
 
         group_create_infos.push(
@@ -2497,6 +2506,7 @@ impl crate::Device for super::Device {
             &desc.ray_miss_stage,
             naga::ShaderStage::RayMiss,
             &desc.layout.binding_arrays,
+            desc.max_recursion_depth,
         )?;
 
         group_create_infos.push(
@@ -2515,6 +2525,7 @@ impl crate::Device for super::Device {
                 &intersection_group.ray_closest_hit,
                 naga::ShaderStage::RayClosestHit,
                 &desc.layout.binding_arrays,
+                desc.max_recursion_depth,
             )?;
 
             let closest_hit_index = create_infos.len() as u32;
@@ -2527,6 +2538,7 @@ impl crate::Device for super::Device {
                     any_hit,
                     naga::ShaderStage::RayAnyHit,
                     &desc.layout.binding_arrays,
+                    desc.max_recursion_depth,
                 )?;
 
                 any_hit_index = create_infos.len() as u32;

@@ -744,6 +744,7 @@ fn write_output(
                     pipeline_options_owned = spv::PipelineOptions {
                         entry_point: name.clone(),
                         shader_stage: module.entry_points[ep_index].stage,
+                        max_ray_pipeline_recursion_depth: u32::MAX,
                     };
                     Some(&pipeline_options_owned)
                 }

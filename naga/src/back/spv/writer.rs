@@ -25,6 +25,7 @@ use crate::{
 struct FunctionInterface<'a> {
     varying_ids: &'a mut Vec<Word>,
     stage: crate::ShaderStage,
+    incoming_payload: Option<Handle<crate::GlobalVariable>,>
 }
 
 impl Function {
@@ -95,6 +96,9 @@ impl Writer {
             temp_list: Vec::new(),
             ray_get_committed_intersection_function: None,
             ray_get_candidate_intersection_function: None,
+            recursion_counter: None,
+            trace_ray_function: crate::FastHashMap::default(),
+            maximum_ray_tracing_recursion_depth: u32::MAX,
         })
     }
 
@@ -135,6 +139,7 @@ impl Writer {
             id_gen,
             void_type,
             gl450_ext_inst_id,
+            maximum_ray_tracing_recursion_depth: u32::MAX,
 
             // Recycled:
             capabilities_used: take(&mut self.capabilities_used).recycle(),
@@ -154,6 +159,8 @@ impl Writer {
             temp_list: take(&mut self.temp_list).recycle(),
             ray_get_candidate_intersection_function: None,
             ray_get_committed_intersection_function: None,
+            recursion_counter: None,
+            trace_ray_function: take(&mut self.trace_ray_function).recycle(),
         };
 
         *self = fresh;
@@ -706,6 +713,29 @@ impl Writer {
 
         let mut local_invocation_id = None;
 
+        // Get the recursion depth, and write it to our local variable for it.
+        if let Some(FunctionInterface { incoming_payload: Some(incoming_payload), .. }) = interface {
+            let gv = self.global_variables[incoming_payload].clone();
+            let class = map_storage_class(crate::AddressSpace::IncomingRayPayload);
+            let type_id = self.get_u32_type_id();
+            let pointer_type_id = self.get_pointer_type_id(type_id, class);
+            let index_id = self.get_index_constant(1);
+            let id = self.id_gen.next();
+            prelude.body.push(Instruction::access_chain(
+                pointer_type_id,
+                id,
+                gv.var_id,
+                &[index_id],
+            ));
+
+            let recursion_storage = self.write_recursion_storage();
+
+            let loaded_recursion = self.id_gen.next();
+            prelude.body.push(Instruction::load(self.get_u32_type_id(), loaded_recursion, id, None));
+
+            prelude.body.push(Instruction::store(recursion_storage, loaded_recursion, None));
+        }
+
         let mut parameter_type_ids = Vec::with_capacity(ir_function.arguments.len());
         for argument in ir_function.arguments.iter() {
             let class = spirv::StorageClass::Input;
@@ -1116,6 +1146,7 @@ impl Writer {
             Some(FunctionInterface {
                 varying_ids: &mut interface_ids,
                 stage: entry_point.stage,
+                incoming_payload: entry_point.incoming_payload_handle,
             }),
             debug_info,
         )?;
@@ -1190,7 +1221,8 @@ impl Writer {
         | crate::ShaderStage::RayAnyHit
         | crate::ShaderStage::RayMiss = entry_point.stage
         {
-            self.require_any("Ray tracing pipeline", &[spirv::Capability::RayTracingKHR])?
+            self.require_any("Ray tracing pipeline", &[spirv::Capability::RayTracingKHR])?;
+            interface_ids.push(self.write_recursion_storage());
         }
         //self.check(exec_model.required_capabilities())?;
 
@@ -2317,7 +2349,15 @@ impl Writer {
             };
             self.decorate_struct_member(wrapper_type_id, 0, &member, &ir_module.types)?;
 
-            Instruction::type_struct(wrapper_type_id, &[inner_type_id])
+            let memeber_ids = if let crate::AddressSpace::RayPayload | crate::AddressSpace::IncomingRayPayload = global_variable.space {
+                let recursion_counter = self.get_u32_type_id();
+
+                vec![inner_type_id, recursion_counter]
+            } else {
+                vec![inner_type_id]
+            };
+
+            Instruction::type_struct(wrapper_type_id, &memeber_ids)
                 .to_words(&mut self.logical_layout.declarations);
 
             let pointer_type_id = self.id_gen.next();
@@ -2715,6 +2755,7 @@ impl Writer {
                     .iter()
                     .position(|ep| po.shader_stage == ep.stage && po.entry_point == ep.name)
                     .ok_or(Error::EntryPointNotFound)?;
+                self.maximum_ray_tracing_recursion_depth = po.max_ray_pipeline_recursion_depth;
                 Some(index)
             }
             None => None,

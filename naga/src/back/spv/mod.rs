@@ -769,6 +769,14 @@ pub struct Writer {
 
     ray_get_committed_intersection_function: Option<Word>,
     ray_get_candidate_intersection_function: Option<Word>,
+
+    /// The private variable that contains the current recursion depth
+    recursion_counter: Option<Word>,
+
+    /// The trace ray functions for particular payloads
+    trace_ray_function: crate::FastHashMap<Handle<crate::GlobalVariable>, Word>,
+
+    maximum_ray_tracing_recursion_depth: u32,
 }
 
 bitflags::bitflags! {
@@ -886,6 +894,8 @@ pub struct PipelineOptions {
     ///
     /// If no entry point that matches is found while creating a [`Writer`], a error will be thrown.
     pub entry_point: String,
+    /// The maximum number of times a ray tracing pipeline is allowed to recurse
+    pub max_ray_pipeline_recursion_depth: u32,
 }
 
 pub fn write_vec(

@@ -98,6 +98,8 @@ pub fn global_needs_wrapper(ir_module: &crate::Module, var: &crate::GlobalVariab
         crate::AddressSpace::Uniform
         | crate::AddressSpace::Storage { .. }
         | crate::AddressSpace::PushConstant => {}
+        // Always need a wrapper to track recursion depth
+        crate::AddressSpace::RayPayload | crate::AddressSpace::IncomingRayPayload => return true,
         _ => return false,
     };
     match ir_module.types[var.ty].inner {

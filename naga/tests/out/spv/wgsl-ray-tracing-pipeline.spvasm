@@ -1,7 +1,7 @@
 ; SPIR-V
 ; Version: 1.4
 ; Generator: rspirv
-; Bound: 192
+; Bound: 230
 OpCapability Shader
 OpCapability RayQueryKHR
 OpCapability RayTracingKHR
@@ -10,14 +10,14 @@ OpExtension "SPV_KHR_ray_query"
 OpExtension "SPV_KHR_ray_tracing"
 %1 = OpExtInstImport "GLSL.std.450"
 OpMemoryModel Logical GLSL450
-OpEntryPoint RayGenerationNV %18 "empty_ray_gen"
-OpEntryPoint RayGenerationNV %27 "ray_gen_with_unused_payload_type" %22 %25
-OpEntryPoint RayGenerationNV %30 "ray_gen" %11 %13
-OpEntryPoint ClosestHitNV %84 "closest_hit" %48 %50 %52 %55 %57 %60 %62 %64 %66 %69 %71 %74 %76 %78 %80 %82 %15
-OpEntryPoint ClosestHitNV %93 "closest_hit_same_payload" %13 %15
-OpEntryPoint ClosestHitNV %107 "closest_hit_different_payload" %11 %13 %15
-OpEntryPoint AnyHitNV %155 "any_hit" %123 %125 %127 %129 %131 %133 %135 %137 %139 %141 %143 %145 %147 %149 %151 %153 %15
-OpEntryPoint MissNV %189 "miss" %175 %177 %179 %181 %183 %185 %187 %15
+OpEntryPoint RayGenerationNV %20 "empty_ray_gen" %25
+OpEntryPoint RayGenerationNV %32 "ray_gen_with_unused_payload_type" %27 %30 %25
+OpEntryPoint RayGenerationNV %35 "ray_gen" %11 %14 %25
+OpEntryPoint ClosestHitNV %106 "closest_hit" %70 %72 %74 %77 %79 %82 %84 %86 %88 %91 %93 %96 %98 %100 %102 %104 %16 %25
+OpEntryPoint ClosestHitNV %117 "closest_hit_same_payload" %14 %16 %25
+OpEntryPoint ClosestHitNV %143 "closest_hit_different_payload" %11 %14 %16 %25
+OpEntryPoint AnyHitNV %190 "any_hit" %158 %160 %162 %164 %166 %168 %170 %172 %174 %176 %178 %180 %182 %184 %186 %188 %16 %25
+OpEntryPoint MissNV %226 "miss" %212 %214 %216 %218 %220 %222 %224 %16 %25
 OpMemberDecorate %4 0 Offset 0
 OpMemberDecorate %9 0 Offset 0
 OpMemberDecorate %9 1 Offset 4
@@ -25,49 +25,53 @@ OpMemberDecorate %9 2 Offset 8
 OpMemberDecorate %9 3 Offset 12
 OpMemberDecorate %9 4 Offset 16
 OpMemberDecorate %9 5 Offset 32
-OpDecorate %13 DescriptorSet 0
-OpDecorate %13 Binding 0
-OpDecorate %22 BuiltIn LaunchSizeNV
-OpDecorate %25 BuiltIn LaunchIdNV
-OpDecorate %48 BuiltIn LaunchSizeNV
-OpDecorate %50 BuiltIn LaunchIdNV
-OpDecorate %52 BuiltIn WorldRayOriginNV
-OpDecorate %55 BuiltIn WorldRayDirectionNV
-OpDecorate %57 BuiltIn RayTminNV
-OpDecorate %60 BuiltIn RayTminNV
-OpDecorate %62 BuiltIn ObjectRayOriginNV
-OpDecorate %64 BuiltIn ObjectRayDirectionNV
-OpDecorate %66 BuiltIn ObjectToWorldNV
-OpDecorate %69 BuiltIn WorldToObjectNV
-OpDecorate %71 BuiltIn InstanceCustomIndexNV
-OpDecorate %74 BuiltIn HitKindNV
-OpDecorate %76 BuiltIn IncomingRayFlagsNV
-OpDecorate %78 BuiltIn InstanceId
-OpDecorate %80 BuiltIn RayGeometryIndexKHR
-OpDecorate %82 BuiltIn PrimitiveId
-OpDecorate %123 BuiltIn LaunchSizeNV
-OpDecorate %125 BuiltIn LaunchIdNV
-OpDecorate %127 BuiltIn WorldRayOriginNV
-OpDecorate %129 BuiltIn WorldRayDirectionNV
-OpDecorate %131 BuiltIn RayTminNV
-OpDecorate %133 BuiltIn RayTminNV
-OpDecorate %135 BuiltIn ObjectRayOriginNV
-OpDecorate %137 BuiltIn ObjectRayDirectionNV
-OpDecorate %139 BuiltIn ObjectToWorldNV
-OpDecorate %141 BuiltIn WorldToObjectNV
-OpDecorate %143 BuiltIn InstanceCustomIndexNV
-OpDecorate %145 BuiltIn HitKindNV
-OpDecorate %147 BuiltIn IncomingRayFlagsNV
-OpDecorate %149 BuiltIn InstanceId
-OpDecorate %151 BuiltIn RayGeometryIndexKHR
-OpDecorate %153 BuiltIn PrimitiveId
-OpDecorate %175 BuiltIn LaunchSizeNV
-OpDecorate %177 BuiltIn LaunchIdNV
-OpDecorate %179 BuiltIn WorldRayOriginNV
-OpDecorate %181 BuiltIn WorldRayDirectionNV
-OpDecorate %183 BuiltIn RayTminNV
-OpDecorate %185 BuiltIn RayTminNV
-OpDecorate %187 BuiltIn IncomingRayFlagsNV
+OpDecorate %12 Block
+OpMemberDecorate %12 0 Offset 0
+OpDecorate %14 DescriptorSet 0
+OpDecorate %14 Binding 0
+OpDecorate %17 Block
+OpMemberDecorate %17 0 Offset 0
+OpDecorate %27 BuiltIn LaunchSizeNV
+OpDecorate %30 BuiltIn LaunchIdNV
+OpDecorate %70 BuiltIn LaunchSizeNV
+OpDecorate %72 BuiltIn LaunchIdNV
+OpDecorate %74 BuiltIn WorldRayOriginNV
+OpDecorate %77 BuiltIn WorldRayDirectionNV
+OpDecorate %79 BuiltIn RayTminNV
+OpDecorate %82 BuiltIn RayTminNV
+OpDecorate %84 BuiltIn ObjectRayOriginNV
+OpDecorate %86 BuiltIn ObjectRayDirectionNV
+OpDecorate %88 BuiltIn ObjectToWorldNV
+OpDecorate %91 BuiltIn WorldToObjectNV
+OpDecorate %93 BuiltIn InstanceCustomIndexNV
+OpDecorate %96 BuiltIn HitKindNV
+OpDecorate %98 BuiltIn IncomingRayFlagsNV
+OpDecorate %100 BuiltIn InstanceId
+OpDecorate %102 BuiltIn RayGeometryIndexKHR
+OpDecorate %104 BuiltIn PrimitiveId
+OpDecorate %158 BuiltIn LaunchSizeNV
+OpDecorate %160 BuiltIn LaunchIdNV
+OpDecorate %162 BuiltIn WorldRayOriginNV
+OpDecorate %164 BuiltIn WorldRayDirectionNV
+OpDecorate %166 BuiltIn RayTminNV
+OpDecorate %168 BuiltIn RayTminNV
+OpDecorate %170 BuiltIn ObjectRayOriginNV
+OpDecorate %172 BuiltIn ObjectRayDirectionNV
+OpDecorate %174 BuiltIn ObjectToWorldNV
+OpDecorate %176 BuiltIn WorldToObjectNV
+OpDecorate %178 BuiltIn InstanceCustomIndexNV
+OpDecorate %180 BuiltIn HitKindNV
+OpDecorate %182 BuiltIn IncomingRayFlagsNV
+OpDecorate %184 BuiltIn InstanceId
+OpDecorate %186 BuiltIn RayGeometryIndexKHR
+OpDecorate %188 BuiltIn PrimitiveId
+OpDecorate %212 BuiltIn LaunchSizeNV
+OpDecorate %214 BuiltIn LaunchIdNV
+OpDecorate %216 BuiltIn WorldRayOriginNV
+OpDecorate %218 BuiltIn WorldRayDirectionNV
+OpDecorate %220 BuiltIn RayTminNV
+OpDecorate %222 BuiltIn RayTminNV
+OpDecorate %224 BuiltIn IncomingRayFlagsNV
 %2 = OpTypeVoid
 %3 = OpTypeInt 32 0
 %4 = OpTypeStruct %3
@@ -77,229 +81,281 @@ OpDecorate %187 BuiltIn IncomingRayFlagsNV
 %8 = OpTypeVector %7 3
 %9 = OpTypeStruct %3 %3 %7 %7 %8 %8
 %10 = OpTypeMatrix %8 4
-%12 = OpTypePointer RayPayloadNV %4
-%11 = OpVariable  %12  RayPayloadNV
-%14 = OpTypePointer UniformConstant %6
-%13 = OpVariable  %14  UniformConstant
-%16 = OpTypePointer IncomingRayPayloadNV %4
-%15 = OpVariable  %16  IncomingRayPayloadNV
-%19 = OpTypeFunction %2
-%23 = OpTypePointer Input %5
-%22 = OpVariable  %23  Input
-%25 = OpVariable  %23  Input
-%32 = OpConstant  %3  5
-%33 = OpConstantNull  %9
-%35 = OpTypePointer RayPayloadNV %3
-%36 = OpConstant  %3  0
-%45 = OpTypeInt 32 1
-%44 = OpConstant  %45  0
-%46 = OpConstant  %45  1
-%48 = OpVariable  %23  Input
-%50 = OpVariable  %23  Input
-%53 = OpTypePointer Input %8
-%52 = OpVariable  %53  Input
-%55 = OpVariable  %53  Input
-%58 = OpTypePointer Input %7
-%57 = OpVariable  %58  Input
-%60 = OpVariable  %58  Input
-%62 = OpVariable  %53  Input
-%64 = OpVariable  %53  Input
-%67 = OpTypePointer Input %10
-%66 = OpVariable  %67  Input
-%69 = OpVariable  %67  Input
-%72 = OpTypePointer Input %3
-%71 = OpVariable  %72  Input
-%74 = OpVariable  %72  Input
-%76 = OpVariable  %72  Input
-%78 = OpVariable  %72  Input
-%80 = OpVariable  %72  Input
-%82 = OpVariable  %72  Input
-%85 = OpConstant  %3  1
-%87 = OpTypePointer IncomingRayPayloadNV %3
-%109 = OpConstant  %3  3
-%123 = OpVariable  %23  Input
-%125 = OpVariable  %23  Input
-%127 = OpVariable  %53  Input
-%129 = OpVariable  %53  Input
-%131 = OpVariable  %58  Input
-%133 = OpVariable  %58  Input
-%135 = OpVariable  %53  Input
-%137 = OpVariable  %53  Input
-%139 = OpVariable  %67  Input
-%141 = OpVariable  %67  Input
-%143 = OpVariable  %72  Input
-%145 = OpVariable  %72  Input
-%147 = OpVariable  %72  Input
-%149 = OpVariable  %72  Input
-%151 = OpVariable  %72  Input
-%153 = OpVariable  %72  Input
-%156 = OpConstant  %3  2
-%158 = OpTypeBool
-%175 = OpVariable  %23  Input
-%177 = OpVariable  %23  Input
-%179 = OpVariable  %53  Input
-%181 = OpVariable  %53  Input
-%183 = OpVariable  %58  Input
-%185 = OpVariable  %58  Input
-%187 = OpVariable  %72  Input
-%18 = OpFunction  %2  None %19
-%17 = OpLabel
-OpBranch %20
-%20 = OpLabel
+%12 = OpTypeStruct %4 %3
+%13 = OpTypePointer RayPayloadNV %12
+%11 = OpVariable  %13  RayPayloadNV
+%15 = OpTypePointer UniformConstant %6
+%14 = OpVariable  %15  UniformConstant
+%17 = OpTypeStruct %4 %3
+%18 = OpTypePointer IncomingRayPayloadNV %17
+%16 = OpVariable  %18  IncomingRayPayloadNV
+%21 = OpTypeFunction %2
+%23 = OpTypePointer Private %3
+%24 = OpConstant  %3  0
+%25 = OpVariable  %23  Private %24
+%28 = OpTypePointer Input %5
+%27 = OpVariable  %28  Input
+%30 = OpVariable  %28  Input
+%36 = OpTypePointer RayPayloadNV %4
+%39 = OpConstant  %3  5
+%40 = OpConstantNull  %9
+%42 = OpTypePointer RayPayloadNV %3
+%44 = OpTypeFunction %2 %6 %9
+%50 = OpConstant  %3  4294967295
+%52 = OpTypeBool
+%62 = OpTypeInt 32 1
+%61 = OpConstant  %62  0
+%63 = OpConstant  %62  1
+%66 = OpTypePointer IncomingRayPayloadNV %3
+%67 = OpConstant  %3  1
+%70 = OpVariable  %28  Input
+%72 = OpVariable  %28  Input
+%75 = OpTypePointer Input %8
+%74 = OpVariable  %75  Input
+%77 = OpVariable  %75  Input
+%80 = OpTypePointer Input %7
+%79 = OpVariable  %80  Input
+%82 = OpVariable  %80  Input
+%84 = OpVariable  %75  Input
+%86 = OpVariable  %75  Input
+%89 = OpTypePointer Input %10
+%88 = OpVariable  %89  Input
+%91 = OpVariable  %89  Input
+%94 = OpTypePointer Input %3
+%93 = OpVariable  %94  Input
+%96 = OpVariable  %94  Input
+%98 = OpVariable  %94  Input
+%100 = OpVariable  %94  Input
+%102 = OpVariable  %94  Input
+%104 = OpVariable  %94  Input
+%107 = OpTypePointer IncomingRayPayloadNV %4
+%147 = OpConstant  %3  3
+%158 = OpVariable  %28  Input
+%160 = OpVariable  %28  Input
+%162 = OpVariable  %75  Input
+%164 = OpVariable  %75  Input
+%166 = OpVariable  %80  Input
+%168 = OpVariable  %80  Input
+%170 = OpVariable  %75  Input
+%172 = OpVariable  %75  Input
+%174 = OpVariable  %89  Input
+%176 = OpVariable  %89  Input
+%178 = OpVariable  %94  Input
+%180 = OpVariable  %94  Input
+%182 = OpVariable  %94  Input
+%184 = OpVariable  %94  Input
+%186 = OpVariable  %94  Input
+%188 = OpVariable  %94  Input
+%192 = OpConstant  %3  2
+%212 = OpVariable  %28  Input
+%214 = OpVariable  %28  Input
+%216 = OpVariable  %75  Input
+%218 = OpVariable  %75  Input
+%220 = OpVariable  %80  Input
+%222 = OpVariable  %80  Input
+%224 = OpVariable  %94  Input
+%20 = OpFunction  %2  None %21
+%19 = OpLabel
+OpBranch %22
+%22 = OpLabel
 OpReturn
 OpFunctionEnd
-%27 = OpFunction  %2  None %19
-%21 = OpLabel
-%24 = OpLoad  %5  %22
-%26 = OpLoad  %5  %25
-OpBranch %28
-%28 = OpLabel
+%32 = OpFunction  %2  None %21
+%26 = OpLabel
+%29 = OpLoad  %5  %27
+%31 = OpLoad  %5  %30
+OpBranch %33
+%33 = OpLabel
 OpReturn
 OpFunctionEnd
-%30 = OpFunction  %2  None %19
-%29 = OpLabel
-%31 = OpLoad  %6  %13
-OpBranch %34
+%45 = OpFunction  %2  None %44
+%46 = OpFunctionParameter  %6
+%47 = OpFunctionParameter  %9
+%48 = OpLabel
+%51 = OpLoad  %3  %25
+%49 = OpULessThan  %52  %51 %50
+OpSelectionMerge %54 None
+OpBranchConditional %49 %53 %54
+%53 = OpLabel
+%55 = OpCompositeExtract  %3  %47 0
+%56 = OpCompositeExtract  %3  %47 1
+%57 = OpCompositeExtract  %7  %47 2
+%58 = OpCompositeExtract  %7  %47 3
+%59 = OpCompositeExtract  %8  %47 4
+%60 = OpCompositeExtract  %8  %47 5
+OpTraceRayKHR %46 %55 %56 %61 %63 %61 %59 %57 %60 %58 %11
+OpBranch %54
+%54 = OpLabel
+OpReturn
+OpFunctionEnd
+%35 = OpFunction  %2  None %21
 %34 = OpLabel
-%37 = OpAccessChain  %35  %11 %36
-OpStore %37 %32
-%38 = OpCompositeExtract  %3  %33 0
-%39 = OpCompositeExtract  %3  %33 1
-%40 = OpCompositeExtract  %7  %33 2
-%41 = OpCompositeExtract  %7  %33 3
-%42 = OpCompositeExtract  %8  %33 4
-%43 = OpCompositeExtract  %8  %33 5
-OpTraceRayKHR %31 %38 %39 %44 %46 %44 %42 %40 %43 %41 %11
+%37 = OpAccessChain  %36  %11 %24
+%38 = OpLoad  %6  %14
+OpBranch %41
+%41 = OpLabel
+%43 = OpAccessChain  %42  %37 %24
+OpStore %43 %39
+%64 = OpFunctionCall  %2  %45 %38 %40
 OpReturn
 OpFunctionEnd
-%84 = OpFunction  %2  None %19
-%47 = OpLabel
-%49 = OpLoad  %5  %48
-%51 = OpLoad  %5  %50
-%54 = OpLoad  %8  %52
-%56 = OpLoad  %8  %55
-%59 = OpLoad  %7  %57
-%61 = OpLoad  %7  %60
-%63 = OpLoad  %8  %62
-%65 = OpLoad  %8  %64
-%68 = OpLoad  %10  %66
-%70 = OpLoad  %10  %69
-%73 = OpLoad  %3  %71
-%75 = OpLoad  %3  %74
-%77 = OpLoad  %3  %76
-%79 = OpLoad  %3  %78
-%81 = OpLoad  %3  %80
-%83 = OpLoad  %3  %82
-OpBranch %86
-%86 = OpLabel
-%88 = OpAccessChain  %87  %15 %36
-%89 = OpLoad  %3  %88
-%90 = OpIAdd  %3  %89 %85
-%91 = OpAccessChain  %87  %15 %36
-OpStore %91 %90
-OpReturn
-OpFunctionEnd
-%93 = OpFunction  %2  None %19
-%92 = OpLabel
-%94 = OpLoad  %6  %13
-OpBranch %95
-%95 = OpLabel
-%96 = OpAccessChain  %87  %15 %36
+%106 = OpFunction  %2  None %21
+%65 = OpLabel
+%68 = OpAccessChain  %66  %16 %67
+%69 = OpLoad  %3  %68
+OpStore %25 %69
+%71 = OpLoad  %5  %70
+%73 = OpLoad  %5  %72
+%76 = OpLoad  %8  %74
+%78 = OpLoad  %8  %77
+%81 = OpLoad  %7  %79
+%83 = OpLoad  %7  %82
+%85 = OpLoad  %8  %84
+%87 = OpLoad  %8  %86
+%90 = OpLoad  %10  %88
+%92 = OpLoad  %10  %91
+%95 = OpLoad  %3  %93
 %97 = OpLoad  %3  %96
-%98 = OpIAdd  %3  %97 %85
-%99 = OpAccessChain  %87  %15 %36
-OpStore %99 %98
-%100 = OpCompositeExtract  %3  %33 0
-%101 = OpCompositeExtract  %3  %33 1
-%102 = OpCompositeExtract  %7  %33 2
-%103 = OpCompositeExtract  %7  %33 3
-%104 = OpCompositeExtract  %8  %33 4
-%105 = OpCompositeExtract  %8  %33 5
-OpTraceRayKHR %94 %100 %101 %44 %46 %44 %104 %102 %105 %103 %15
+%99 = OpLoad  %3  %98
+%101 = OpLoad  %3  %100
+%103 = OpLoad  %3  %102
+%105 = OpLoad  %3  %104
+%108 = OpAccessChain  %107  %16 %24
+OpBranch %109
+%109 = OpLabel
+%110 = OpAccessChain  %66  %108 %24
+%111 = OpLoad  %3  %110
+%112 = OpIAdd  %3  %111 %67
+%113 = OpAccessChain  %66  %108 %24
+OpStore %113 %112
 OpReturn
 OpFunctionEnd
-%107 = OpFunction  %2  None %19
-%106 = OpLabel
-%108 = OpLoad  %6  %13
-OpBranch %110
-%110 = OpLabel
-%111 = OpAccessChain  %35  %11 %36
-OpStore %111 %109
-%112 = OpAccessChain  %87  %15 %36
-%113 = OpLoad  %3  %112
-%114 = OpIAdd  %3  %113 %85
-%115 = OpAccessChain  %87  %15 %36
-OpStore %115 %114
-%116 = OpCompositeExtract  %3  %33 0
-%117 = OpCompositeExtract  %3  %33 1
-%118 = OpCompositeExtract  %7  %33 2
-%119 = OpCompositeExtract  %7  %33 3
-%120 = OpCompositeExtract  %8  %33 4
-%121 = OpCompositeExtract  %8  %33 5
-OpTraceRayKHR %108 %116 %117 %44 %46 %44 %120 %118 %121 %119 %11
+%125 = OpFunction  %2  None %44
+%126 = OpFunctionParameter  %6
+%127 = OpFunctionParameter  %9
+%128 = OpLabel
+%130 = OpLoad  %3  %25
+%129 = OpULessThan  %52  %130 %50
+OpSelectionMerge %132 None
+OpBranchConditional %129 %131 %132
+%131 = OpLabel
+%133 = OpCompositeExtract  %3  %127 0
+%134 = OpCompositeExtract  %3  %127 1
+%135 = OpCompositeExtract  %7  %127 2
+%136 = OpCompositeExtract  %7  %127 3
+%137 = OpCompositeExtract  %8  %127 4
+%138 = OpCompositeExtract  %8  %127 5
+OpTraceRayKHR %126 %133 %134 %61 %63 %61 %137 %135 %138 %136 %16
+OpBranch %132
+%132 = OpLabel
 OpReturn
 OpFunctionEnd
-%155 = OpFunction  %2  None %19
-%122 = OpLabel
-%124 = OpLoad  %5  %123
-%126 = OpLoad  %5  %125
-%128 = OpLoad  %8  %127
-%130 = OpLoad  %8  %129
-%132 = OpLoad  %7  %131
-%134 = OpLoad  %7  %133
-%136 = OpLoad  %8  %135
-%138 = OpLoad  %8  %137
-%140 = OpLoad  %10  %139
-%142 = OpLoad  %10  %141
-%144 = OpLoad  %3  %143
-%146 = OpLoad  %3  %145
-%148 = OpLoad  %3  %147
-%150 = OpLoad  %3  %149
-%152 = OpLoad  %3  %151
-%154 = OpLoad  %3  %153
-OpBranch %157
-%157 = OpLabel
-%159 = OpIEqual  %158  %144 %36
-OpSelectionMerge %160 None
-OpBranchConditional %159 %161 %162
-%161 = OpLabel
+%117 = OpFunction  %2  None %21
+%114 = OpLabel
+%115 = OpAccessChain  %66  %16 %67
+%116 = OpLoad  %3  %115
+OpStore %25 %116
+%118 = OpLoad  %6  %14
+%119 = OpAccessChain  %107  %16 %24
+OpBranch %120
+%120 = OpLabel
+%121 = OpAccessChain  %66  %119 %24
+%122 = OpLoad  %3  %121
+%123 = OpIAdd  %3  %122 %67
+%124 = OpAccessChain  %66  %119 %24
+OpStore %124 %123
+%139 = OpFunctionCall  %2  %125 %118 %40
 OpReturn
-%162 = OpLabel
-%163 = OpIEqual  %158  %144 %85
-OpSelectionMerge %164 None
-OpBranchConditional %163 %165 %166
-%165 = OpLabel
+OpFunctionEnd
+%143 = OpFunction  %2  None %21
+%140 = OpLabel
+%141 = OpAccessChain  %66  %16 %67
+%142 = OpLoad  %3  %141
+OpStore %25 %142
+%144 = OpAccessChain  %36  %11 %24
+%145 = OpLoad  %6  %14
+%146 = OpAccessChain  %107  %16 %24
+OpBranch %148
+%148 = OpLabel
+%149 = OpAccessChain  %42  %144 %24
+OpStore %149 %147
+%150 = OpAccessChain  %66  %146 %24
+%151 = OpLoad  %3  %150
+%152 = OpIAdd  %3  %151 %67
+%153 = OpAccessChain  %66  %146 %24
+OpStore %153 %152
+%154 = OpFunctionCall  %2  %45 %145 %40
+OpReturn
+OpFunctionEnd
+%190 = OpFunction  %2  None %21
+%155 = OpLabel
+%156 = OpAccessChain  %66  %16 %67
+%157 = OpLoad  %3  %156
+OpStore %25 %157
+%159 = OpLoad  %5  %158
+%161 = OpLoad  %5  %160
+%163 = OpLoad  %8  %162
+%165 = OpLoad  %8  %164
+%167 = OpLoad  %7  %166
+%169 = OpLoad  %7  %168
+%171 = OpLoad  %8  %170
+%173 = OpLoad  %8  %172
+%175 = OpLoad  %10  %174
+%177 = OpLoad  %10  %176
+%179 = OpLoad  %3  %178
+%181 = OpLoad  %3  %180
+%183 = OpLoad  %3  %182
+%185 = OpLoad  %3  %184
+%187 = OpLoad  %3  %186
+%189 = OpLoad  %3  %188
+%191 = OpAccessChain  %107  %16 %24
+OpBranch %193
+%193 = OpLabel
+%194 = OpIEqual  %52  %179 %24
+OpSelectionMerge %195 None
+OpBranchConditional %194 %196 %197
+%196 = OpLabel
+OpReturn
+%197 = OpLabel
+%198 = OpIEqual  %52  %179 %67
+OpSelectionMerge %199 None
+OpBranchConditional %198 %200 %201
+%200 = OpLabel
 OpIgnoreIntersectionKHR
-%166 = OpLabel
-%167 = OpIEqual  %158  %144 %156
-OpSelectionMerge %168 None
-OpBranchConditional %167 %169 %168
-%169 = OpLabel
+%201 = OpLabel
+%202 = OpIEqual  %52  %179 %192
+OpSelectionMerge %203 None
+OpBranchConditional %202 %204 %203
+%204 = OpLabel
 OpTerminateRayKHR
-%168 = OpLabel
-OpBranch %164
-%164 = OpLabel
-OpBranch %160
-%160 = OpLabel
-%170 = OpAccessChain  %87  %15 %36
-%171 = OpLoad  %3  %170
-%172 = OpIAdd  %3  %171 %85
-%173 = OpAccessChain  %87  %15 %36
-OpStore %173 %172
+%203 = OpLabel
+OpBranch %199
+%199 = OpLabel
+OpBranch %195
+%195 = OpLabel
+%205 = OpAccessChain  %66  %191 %24
+%206 = OpLoad  %3  %205
+%207 = OpIAdd  %3  %206 %67
+%208 = OpAccessChain  %66  %191 %24
+OpStore %208 %207
 OpReturn
 OpFunctionEnd
-%189 = OpFunction  %2  None %19
-%174 = OpLabel
-%176 = OpLoad  %5  %175
-%178 = OpLoad  %5  %177
-%180 = OpLoad  %8  %179
-%182 = OpLoad  %8  %181
-%184 = OpLoad  %7  %183
-%186 = OpLoad  %7  %185
-%188 = OpLoad  %3  %187
-OpBranch %190
-%190 = OpLabel
-%191 = OpAccessChain  %87  %15 %36
-OpStore %191 %36
+%226 = OpFunction  %2  None %21
+%209 = OpLabel
+%210 = OpAccessChain  %66  %16 %67
+%211 = OpLoad  %3  %210
+OpStore %25 %211
+%213 = OpLoad  %5  %212
+%215 = OpLoad  %5  %214
+%217 = OpLoad  %8  %216
+%219 = OpLoad  %8  %218
+%221 = OpLoad  %7  %220
+%223 = OpLoad  %7  %222
+%225 = OpLoad  %3  %224
+%227 = OpAccessChain  %107  %16 %24
+OpBranch %228
+%228 = OpLabel
+%229 = OpAccessChain  %66  %227 %24
+OpStore %229 %24
 OpReturn
 OpFunctionEnd

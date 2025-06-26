@@ -42,6 +42,9 @@ fn any_hit() {
 @ray_miss
 @payload_type(Payload)
 @incoming_payload(incoming_payload)
-fn miss() {
+fn miss(@builtin(ray_launch_id) launch_id: vec3<u32>) {
     incoming_payload.miss_count++;
+    // Attempt to infinitely recurse, this should be prevented
+    let ray = rays_to_trace[launch_id.x];
+    traceRays(acceleration_struct, RayDesc(0, 0xFFu, 0.1, 100.0, ray.origin, ray.direction), &payload);
 }

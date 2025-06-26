@@ -629,6 +629,7 @@ fn write_output_spv(
             let pipeline_options = spv::PipelineOptions {
                 entry_point: ep.name.clone(),
                 shader_stage: ep.stage,
+                max_ray_pipeline_recursion_depth: u32::MAX,
             };
             write_output_spv_inner(
                 input,

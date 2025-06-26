@@ -350,6 +350,7 @@ fn backends(c: &mut Criterion) {
                     let pipeline_options = naga::back::spv::PipelineOptions {
                         shader_stage: ep.stage,
                         entry_point: ep.name.clone(),
+                        max_ray_pipeline_recursion_depth: u32::MAX,
                     };
                     let _ = writer.write(
                         input.module.as_ref().unwrap(),
