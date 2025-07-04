@@ -25,7 +25,7 @@ use crate::{
 struct FunctionInterface<'a> {
     varying_ids: &'a mut Vec<Word>,
     stage: crate::ShaderStage,
-    incoming_payload: Option<Handle<crate::GlobalVariable>,>
+    incoming_payload: Option<Handle<crate::GlobalVariable>>,
 }
 
 impl Function {
@@ -714,7 +714,11 @@ impl Writer {
         let mut local_invocation_id = None;
 
         // Get the recursion depth, and write it to our local variable for it.
-        if let Some(FunctionInterface { incoming_payload: Some(incoming_payload), .. }) = interface {
+        if let Some(FunctionInterface {
+            incoming_payload: Some(incoming_payload),
+            ..
+        }) = interface
+        {
             let gv = self.global_variables[incoming_payload].clone();
             let class = map_storage_class(crate::AddressSpace::IncomingRayPayload);
             let type_id = self.get_u32_type_id();
@@ -731,9 +735,18 @@ impl Writer {
             let recursion_storage = self.write_recursion_storage();
 
             let loaded_recursion = self.id_gen.next();
-            prelude.body.push(Instruction::load(self.get_u32_type_id(), loaded_recursion, id, None));
+            prelude.body.push(Instruction::load(
+                self.get_u32_type_id(),
+                loaded_recursion,
+                id,
+                None,
+            ));
 
-            prelude.body.push(Instruction::store(recursion_storage, loaded_recursion, None));
+            prelude.body.push(Instruction::store(
+                recursion_storage,
+                loaded_recursion,
+                None,
+            ));
         }
 
         let mut parameter_type_ids = Vec::with_capacity(ir_function.arguments.len());
@@ -2349,7 +2362,9 @@ impl Writer {
             };
             self.decorate_struct_member(wrapper_type_id, 0, &member, &ir_module.types)?;
 
-            let memeber_ids = if let crate::AddressSpace::RayPayload | crate::AddressSpace::IncomingRayPayload = global_variable.space {
+            let memeber_ids = if let crate::AddressSpace::RayPayload
+            | crate::AddressSpace::IncomingRayPayload = global_variable.space
+            {
                 let recursion_counter = self.get_u32_type_id();
 
                 vec![inner_type_id, recursion_counter]
