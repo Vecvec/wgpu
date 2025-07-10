@@ -869,6 +869,17 @@ impl PhysicalDeviceFeatures {
                 mesh_shader.multiview_mesh_shader != 0,
             );
         }
+
+        // Remove acceleration structure support if ray queries aren't supported.
+        // We need to auto enable ray queries (or rt pipeline when they get added)
+        // if acceleration structures are supported. This is confirmed on some AMD
+        // GPUs, but is possible on any. Acceleration structure support on its own
+        // will not provide any useful functionality to users so if they couldn't
+        // use ray tracing, so this shouldn't affect any apps.
+        if !features.contains(F::EXPERIMENTAL_RAY_QUERY) {
+            features.remove(F::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE);
+        }
+
         (features, dl_flags)
     }
 }
@@ -1107,8 +1118,16 @@ impl PhysicalDeviceProperties {
             extensions.push(khr::buffer_device_address::NAME);
         }
 
-        // Require `VK_KHR_ray_query` if the associated feature was requested
-        if requested_features.contains(wgt::Features::EXPERIMENTAL_RAY_QUERY) {
+        // Require `VK_KHR_ray_query` if the associated feature was requested or if `EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE` was enabled.
+        // AMD drivers crashed without this (https://github.com/gfx-rs/wgpu/issues/6727), and it is possible that other drivers do as well, so we auto enable this.
+        // This also enables the `PhysicalDeviceRayQueryFeaturesKHR` as that is enabled by this extension being in `extensions`, not by the feature `EXPERIMENTAL_RAY_QUERY`.
+        // This will need a more complex system once ray tracing pipelines is supported.
+        //
+        // We can do this because we diable `EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE` if `EXPERIMENTAL_RAY_QUERY` is not supported.
+        if requested_features.contains(wgt::Features::EXPERIMENTAL_RAY_QUERY)
+            || requested_features
+                .contains(wgt::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
+        {
             extensions.push(khr::ray_query::NAME);
         }
 

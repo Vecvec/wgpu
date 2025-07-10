@@ -4,7 +4,7 @@ use crate::ray_tracing::{acceleration_structure_limits, AsBuildContext};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
 use wgpu_test::{
-    fail, fail_if, gpu_test, FailureCase, GpuTestConfiguration, TestParameters, TestingContext,
+    fail, fail_if, gpu_test, GpuTestConfiguration, TestParameters, TestingContext,
 };
 
 #[gpu_test]
@@ -14,8 +14,6 @@ static UNBUILT_BLAS: GpuTestConfiguration = GpuTestConfiguration::new()
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(unbuilt_blas);
 
@@ -49,8 +47,6 @@ static UNBUILT_BLAS_COMPACTION: GpuTestConfiguration = GpuTestConfiguration::new
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(unbuilt_blas_compaction);
 
@@ -78,8 +74,6 @@ static BLAS_COMPACTION_WITHOUT_FLAGS: GpuTestConfiguration = GpuTestConfiguratio
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(blas_compaction_without_flags);
 
@@ -115,8 +109,6 @@ static UNPREPARED_BLAS_COMPACTION: GpuTestConfiguration = GpuTestConfiguration::
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(unprepared_blas_compaction);
 
@@ -145,8 +137,6 @@ static BLAS_COMPACTION: GpuTestConfiguration = GpuTestConfiguration::new()
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(blas_compaction);
 
@@ -204,8 +194,6 @@ static OUT_OF_ORDER_AS_BUILD: GpuTestConfiguration = GpuTestConfiguration::new()
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(out_of_order_as_build);
 
@@ -291,8 +279,6 @@ static OUT_OF_ORDER_AS_BUILD_USE: GpuTestConfiguration = GpuTestConfiguration::n
                 wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE
                     | wgpu::Features::EXPERIMENTAL_RAY_QUERY,
             )
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(out_of_order_as_build_use);
 
@@ -496,8 +482,6 @@ static BUILD_WITH_TRANSFORM: GpuTestConfiguration = GpuTestConfiguration::new()
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(build_with_transform);
 
@@ -587,8 +571,6 @@ static ONLY_BLAS_VERTEX_RETURN: GpuTestConfiguration = GpuTestConfiguration::new
                     | wgpu::Features::EXPERIMENTAL_RAY_QUERY
                     | wgpu::Features::EXPERIMENTAL_RAY_HIT_VERTEX_RETURN,
             )
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(only_blas_vertex_return);
 
@@ -714,8 +696,6 @@ static ONLY_TLAS_VERTEX_RETURN: GpuTestConfiguration = GpuTestConfiguration::new
                     | wgpu::Features::EXPERIMENTAL_RAY_QUERY
                     | wgpu::Features::EXPERIMENTAL_RAY_HIT_VERTEX_RETURN,
             )
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(only_tlas_vertex_return);
 
@@ -755,8 +735,6 @@ static EXTRA_FORMAT_BUILD: GpuTestConfiguration = GpuTestConfiguration::new()
                 wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE
                     | wgpu::Features::EXTENDED_ACCELERATION_STRUCTURE_VERTEX_FORMATS,
             )
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     .run_sync(|ctx| test_as_build_format_stride(ctx, VertexFormat::Snorm16x4, 6, false));
 
@@ -767,8 +745,6 @@ static MISALIGNED_BUILD: GpuTestConfiguration = GpuTestConfiguration::new()
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     // Larger than the minimum size, but not aligned as required
     .run_sync(|ctx| test_as_build_format_stride(ctx, VertexFormat::Float32x3, 13, true));
@@ -780,8 +756,6 @@ static TOO_SMALL_STRIDE_BUILD: GpuTestConfiguration = GpuTestConfiguration::new(
             .test_features_limits()
             .limits(acceleration_structure_limits())
             .features(wgpu::Features::EXPERIMENTAL_RAY_TRACING_ACCELERATION_STRUCTURE)
-            // https://github.com/gfx-rs/wgpu/issues/6727
-            .skip(FailureCase::backend_adapter(wgpu::Backends::VULKAN, "AMD")),
     )
     // Aligned as required, but smaller than minimum size
     .run_sync(|ctx| test_as_build_format_stride(ctx, VertexFormat::Float32x3, 8, true));
