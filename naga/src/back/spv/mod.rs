@@ -95,6 +95,10 @@ pub struct DebugInfo<'a> {
     pub source_code: &'a str,
     pub file_name: PathLikeRef<'a>,
     pub language: SourceLanguage,
+    /// If naga feels it is possible, it will use the `NonSemantic.Shader.DebugInfo.100`
+    /// However, a certain app might not support it and prefer `OpLine`. This
+    /// forces naga to use `OpLine`
+    pub disable_non_semantic_debug_info: bool,
 }
 
 /// A SPIR-V block to which we are still adding instructions.
@@ -770,6 +774,8 @@ pub struct Writer {
 
     ray_get_committed_intersection_function: Option<Word>,
     ray_get_candidate_intersection_function: Option<Word>,
+
+    non_semantic_debug_info_import: Option<Word>,
 }
 
 bitflags::bitflags! {

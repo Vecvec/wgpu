@@ -518,6 +518,7 @@ fn run() -> anyhow::Result<()> {
                 source_code: input_text,
                 file_name: input_path.into(),
                 language,
+                disable_non_semantic_debug_info: false,
             })
         } else {
             eprintln!(

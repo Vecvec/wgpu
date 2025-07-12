@@ -876,6 +876,7 @@ impl super::Device {
                             source_code: &debug.source_code,
                             file_name: debug.file_name.as_ref().into(),
                             language: naga::back::spv::SourceLanguage::WGSL,
+                            disable_non_semantic_debug_info: false,
                         })
                     }
                     if !stage.zero_initialize_workgroup_memory {
@@ -1891,6 +1892,7 @@ impl crate::Device for super::Device {
                             source_code: d.source_code.as_ref(),
                             file_name: d.file_name.as_ref().into(),
                             language: naga::back::spv::SourceLanguage::WGSL,
+                            disable_non_semantic_debug_info: false,
                         });
                 if !desc.runtime_checks.bounds_checks {
                     naga_options.bounds_check_policies = naga::proc::BoundsCheckPolicies {

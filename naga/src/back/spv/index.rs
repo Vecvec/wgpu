@@ -368,7 +368,7 @@ impl BlockContext<'_> {
         let restricted_index_id = self.gen_id();
         block.body.push(Instruction::ext_inst(
             self.writer.gl450_ext_inst_id,
-            spirv::GLOp::UMin,
+            spirv::GLOp::UMin as u32,
             self.writer.get_u32_type_id(),
             restricted_index_id,
             &[index_id, max_index_id],

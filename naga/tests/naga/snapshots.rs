@@ -481,6 +481,7 @@ fn check_targets(input: &Input, module: &mut naga::Module, source_code: Option<&
                     // produce the valid language but it's not too important for
                     // validation purposes
                     language: naga::back::spv::SourceLanguage::Unknown,
+                    disable_non_semantic_debug_info: false,
                 })
             }
 

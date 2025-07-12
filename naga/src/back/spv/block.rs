@@ -146,6 +146,8 @@ struct LoopContext {
 pub(crate) struct DebugInfoInner<'a> {
     pub source_code: &'a str,
     pub source_file_id: Word,
+    /// The `DebugSource` if `NonSemantic.Shader.DebugInfo.100` is enabled, otherwise, `None`
+    pub debug_source: Option<Word>,
 }
 
 impl Writer {
@@ -205,7 +207,7 @@ impl Writer {
         let clamp_id = self.id_gen.next();
         body.push(Instruction::ext_inst(
             self.gl450_ext_inst_id,
-            spirv::GLOp::FClamp,
+            spirv::GLOp::FClamp as u32,
             float_type_id,
             clamp_id,
             &[original_id, zero_scalar_id, one_scalar_id],
@@ -1028,7 +1030,7 @@ impl BlockContext<'_> {
                             let max_id = self.gen_id();
                             block.body.push(Instruction::ext_inst(
                                 self.writer.gl450_ext_inst_id,
-                                max_op,
+                                max_op as u32,
                                 result_type_id,
                                 max_id,
                                 &[arg0_id, arg1_id],
@@ -1036,7 +1038,7 @@ impl BlockContext<'_> {
 
                             MathOp::Custom(Instruction::ext_inst(
                                 self.writer.gl450_ext_inst_id,
-                                min_op,
+                                min_op as u32,
                                 result_type_id,
                                 id,
                                 &[max_id, arg2_id],
@@ -1070,7 +1072,7 @@ impl BlockContext<'_> {
 
                         MathOp::Custom(Instruction::ext_inst(
                             self.writer.gl450_ext_inst_id,
-                            spirv::GLOp::FClamp,
+                            spirv::GLOp::FClamp as u32,
                             result_type_id,
                             id,
                             &[arg0_id, arg1_id, arg2_id],
@@ -1284,7 +1286,7 @@ impl BlockContext<'_> {
 
                                 MathOp::Custom(Instruction::ext_inst(
                                     self.writer.gl450_ext_inst_id,
-                                    spirv::GLOp::FMix,
+                                    spirv::GLOp::FMix as u32,
                                     result_type_id,
                                     id,
                                     &[arg0_id, arg1_id, selector_id],
@@ -1341,7 +1343,7 @@ impl BlockContext<'_> {
                         let lsb_id = self.gen_id();
                         block.body.push(Instruction::ext_inst(
                             self.writer.gl450_ext_inst_id,
-                            spirv::GLOp::FindILsb,
+                            spirv::GLOp::FindILsb as u32,
                             result_type_id,
                             lsb_id,
                             &[arg0_id],
@@ -1349,7 +1351,7 @@ impl BlockContext<'_> {
 
                         MathOp::Custom(Instruction::ext_inst(
                             self.writer.gl450_ext_inst_id,
-                            spirv::GLOp::UMin,
+                            spirv::GLOp::UMin as u32,
                             result_type_id,
                             id,
                             &[uint_id, lsb_id],
@@ -1394,7 +1396,7 @@ impl BlockContext<'_> {
                                 spirv::GLOp::FindILsb
                             } else {
                                 spirv::GLOp::FindUMsb
-                            },
+                            } as u32,
                             int_type_id,
                             msb_id,
                             &[arg0_id],
@@ -1447,7 +1449,7 @@ impl BlockContext<'_> {
                         let offset_id = self.gen_id();
                         block.body.push(Instruction::ext_inst(
                             self.writer.gl450_ext_inst_id,
-                            spirv::GLOp::UMin,
+                            spirv::GLOp::UMin as u32,
                             u32_type,
                             offset_id,
                             &[arg1_id, width_constant],
@@ -1467,7 +1469,7 @@ impl BlockContext<'_> {
                         let count_id = self.gen_id();
                         block.body.push(Instruction::ext_inst(
                             self.writer.gl450_ext_inst_id,
-                            spirv::GLOp::UMin,
+                            spirv::GLOp::UMin as u32,
                             u32_type,
                             count_id,
                             &[arg2_id, max_count_id],
@@ -1497,7 +1499,7 @@ impl BlockContext<'_> {
                         let offset_id = self.gen_id();
                         block.body.push(Instruction::ext_inst(
                             self.writer.gl450_ext_inst_id,
-                            spirv::GLOp::UMin,
+                            spirv::GLOp::UMin as u32,
                             u32_type,
                             offset_id,
                             &[arg2_id, width_constant],
@@ -1517,7 +1519,7 @@ impl BlockContext<'_> {
                         let count_id = self.gen_id();
                         block.body.push(Instruction::ext_inst(
                             self.writer.gl450_ext_inst_id,
-                            spirv::GLOp::UMin,
+                            spirv::GLOp::UMin as u32,
                             u32_type,
                             count_id,
                             &[arg3_id, max_count_id],
@@ -1612,7 +1614,7 @@ impl BlockContext<'_> {
                 block.body.push(match math_op {
                     MathOp::Ext(op) => Instruction::ext_inst(
                         self.writer.gl450_ext_inst_id,
-                        op,
+                        op as u32,
                         result_type_id,
                         id,
                         &[arg0_id, arg1_id, arg2_id, arg3_id][..fun.argument_count()],
@@ -2010,7 +2012,7 @@ impl BlockContext<'_> {
                 let clamp_id = self.gen_id();
                 block.body.push(Instruction::ext_inst(
                     self.writer.gl450_ext_inst_id,
-                    spirv::GLOp::FClamp,
+                    spirv::GLOp::FClamp as u32,
                     expr_type_id,
                     clamp_id,
                     &[expr_id, min_const_id, max_const_id],
@@ -2673,7 +2675,7 @@ impl BlockContext<'_> {
             let clamp_id = self.gen_id();
             block.body.push(Instruction::ext_inst(
                 self.writer.gl450_ext_inst_id,
-                clamp_op,
+                clamp_op as u32,
                 wide_vector_type_id,
                 clamp_id,
                 &[wide_vector, min, max],
@@ -2767,7 +2769,7 @@ impl BlockContext<'_> {
                 let clamp_id = self.gen_id();
                 block.body.push(Instruction::ext_inst(
                     self.writer.gl450_ext_inst_id,
-                    clamp_op,
+                    clamp_op as u32,
                     result_type_id,
                     clamp_id,
                     &[extracted, min, max],
@@ -2937,11 +2939,10 @@ impl BlockContext<'_> {
                 ),
             ) {
                 let loc: crate::SourceLocation = span.location(debug_info.source_code);
-                block.body.push(Instruction::line(
-                    debug_info.source_file_id,
-                    loc.line_number,
-                    loc.line_position,
-                ));
+                let contained_str = &debug_info.source_code[*span];
+                let line_count: u32 = contained_str.matches("\n").count() as u32;
+                let column_end_offset = contained_str.rfind("\n").map(|dist| (contained_str.len() - dist) as u32).unwrap_or(loc.line_position + loc.length);
+                self.write_line(&mut block, debug_info.source_file_id, debug_info.debug_source, loc.line_number, loc.line_number + line_count, loc.line_position, column_end_offset);
             };
             match *statement {
                 Statement::Emit(ref range) => {
@@ -3144,11 +3145,10 @@ impl BlockContext<'_> {
                     // so we need to put `OpLine` debug info before merge instruction
                     if let Some(debug_info) = debug_info {
                         let loc: crate::SourceLocation = span.location(debug_info.source_code);
-                        block.body.push(Instruction::line(
-                            debug_info.source_file_id,
-                            loc.line_number,
-                            loc.line_position,
-                        ))
+                        let contained_str = &debug_info.source_code[*span];
+                        let line_count: u32 = contained_str.matches("\n").count() as u32;
+                        let column_end_offset = contained_str.rfind("\n").map(|dist| (contained_str.len() - dist) as u32).unwrap_or(loc.line_position + loc.length);
+                        self.write_line(&mut block, debug_info.source_file_id, debug_info.debug_source, loc.line_number, loc.line_number + line_count, loc.line_position, column_end_offset);       
                     }
                     block.body.push(Instruction::loop_merge(
                         merge_id,
@@ -3678,6 +3678,35 @@ impl BlockContext<'_> {
 
         self.function.consume(block, termination);
         Ok(BlockExitDisposition::Used)
+    }
+
+    fn write_line(&mut self, block: &mut Block, file: Word, source: Option<Word>, line_start: u32, line_end: u32, column_start: u32, column_end: u32) {
+        match self.writer.non_semantic_debug_info_import {
+            Some(non_semantic_debug_info_import) => {
+                let line_start = self.writer.get_constant_scalar(crate::Literal::U32(line_start));
+                let line_end = self.writer.get_constant_scalar(crate::Literal::U32(line_end));
+                let column_start = self.writer.get_constant_scalar(crate::Literal::U32(column_start));
+                let column_end = self.writer.get_constant_scalar(crate::Literal::U32(column_end));
+
+                // `NonSemantic.Shader.DebugInfo.100` is not yet supported
+                // in the rust bindings.
+                // See https://github.com/gfx-rs/rspirv/pull/256
+                block.body.push(Instruction::ext_inst(
+                    non_semantic_debug_info_import,
+                    103u32,
+                    self.writer.void_type,
+                    self.gen_id(),
+                    &[source.expect("source must be written out if using `non_semantic_debug_info_import`"), line_start, line_end, column_start, column_end,]
+                ));
+            }
+            None => {
+                block.body.push(Instruction::line(
+                    file,
+                    line_start,
+                    column_start,
+                ));
+            }
+        }
     }
 
     pub(super) fn write_function_body(
