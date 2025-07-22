@@ -2942,8 +2942,17 @@ impl BlockContext<'_> {
                 let loc: crate::SourceLocation = span.location(debug_info.source_code);
                 let contained_str = &debug_info.source_code[*span];
                 let line_count: u32 = contained_str.matches("\n").count() as u32;
-                let column_end_offset = contained_str.rfind("\n").map(|dist| (contained_str.len() - dist) as u32).unwrap_or(loc.line_position + loc.length);
-                self.write_line(&mut block, debug_info.source_file_id, debug_info.debug_source, loc.line_number..(loc.line_number + line_count), loc.line_position..column_end_offset);
+                let column_end_offset = contained_str
+                    .rfind("\n")
+                    .map(|dist| (contained_str.len() - dist) as u32)
+                    .unwrap_or(loc.line_position + loc.length);
+                self.write_line(
+                    &mut block,
+                    debug_info.source_file_id,
+                    debug_info.debug_source,
+                    loc.line_number..(loc.line_number + line_count),
+                    loc.line_position..column_end_offset,
+                );
             };
             match *statement {
                 Statement::Emit(ref range) => {
@@ -3148,8 +3157,17 @@ impl BlockContext<'_> {
                         let loc: crate::SourceLocation = span.location(debug_info.source_code);
                         let contained_str = &debug_info.source_code[*span];
                         let line_count: u32 = contained_str.matches("\n").count() as u32;
-                        let column_end_offset = contained_str.rfind("\n").map(|dist| (contained_str.len() - dist) as u32).unwrap_or(loc.line_position + loc.length);
-                        self.write_line(&mut block, debug_info.source_file_id, debug_info.debug_source, loc.line_number..(loc.line_number + line_count), loc.line_position..column_end_offset);       
+                        let column_end_offset = contained_str
+                            .rfind("\n")
+                            .map(|dist| (contained_str.len() - dist) as u32)
+                            .unwrap_or(loc.line_position + loc.length);
+                        self.write_line(
+                            &mut block,
+                            debug_info.source_file_id,
+                            debug_info.debug_source,
+                            loc.line_number..(loc.line_number + line_count),
+                            loc.line_position..column_end_offset,
+                        );
                     }
                     block.body.push(Instruction::loop_merge(
                         merge_id,
@@ -3681,13 +3699,28 @@ impl BlockContext<'_> {
         Ok(BlockExitDisposition::Used)
     }
 
-    fn write_line(&mut self, block: &mut Block, file: Word, source: Option<Word>, lines: Range<u32>, columns: Range<u32>) {
+    fn write_line(
+        &mut self,
+        block: &mut Block,
+        file: Word,
+        source: Option<Word>,
+        lines: Range<u32>,
+        columns: Range<u32>,
+    ) {
         match self.writer.non_semantic_debug_info_import {
             Some(non_semantic_debug_info_import) => {
-                let line_start = self.writer.get_constant_scalar(crate::Literal::U32(lines.start));
-                let line_end = self.writer.get_constant_scalar(crate::Literal::U32(lines.end));
-                let column_start = self.writer.get_constant_scalar(crate::Literal::U32(columns.start));
-                let column_end = self.writer.get_constant_scalar(crate::Literal::U32(columns.end));
+                let line_start = self
+                    .writer
+                    .get_constant_scalar(crate::Literal::U32(lines.start));
+                let line_end = self
+                    .writer
+                    .get_constant_scalar(crate::Literal::U32(lines.end));
+                let column_start = self
+                    .writer
+                    .get_constant_scalar(crate::Literal::U32(columns.start));
+                let column_end = self
+                    .writer
+                    .get_constant_scalar(crate::Literal::U32(columns.end));
 
                 // `NonSemantic.Shader.DebugInfo.100` is not yet supported
                 // in the rust bindings.
@@ -3697,15 +3730,21 @@ impl BlockContext<'_> {
                     103u32,
                     self.writer.void_type,
                     self.gen_id(),
-                    &[source.expect("source must be written out if using `non_semantic_debug_info_import`"), line_start, line_end, column_start, column_end,]
+                    &[
+                        source.expect(
+                            "source must be written out if using `non_semantic_debug_info_import`",
+                        ),
+                        line_start,
+                        line_end,
+                        column_start,
+                        column_end,
+                    ],
                 ));
             }
             None => {
-                block.body.push(Instruction::line(
-                    file,
-                    lines.start,
-                    columns.start,
-                ));
+                block
+                    .body
+                    .push(Instruction::line(file, lines.start, columns.start));
             }
         }
     }

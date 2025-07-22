@@ -2414,8 +2414,11 @@ impl Writer {
             if let Some(debug_info) = debug_info.as_ref() {
                 if !debug_info.disable_non_semantic_debug_info && self.lang_version() >= (1, 6) {
                     let non_semantic_debug_info_id = self.id_gen.next();
-                    Instruction::ext_inst_import(non_semantic_debug_info_id, "NonSemantic.Shader.DebugInfo.100")
-                        .to_words(&mut self.logical_layout.ext_inst_imports);
+                    Instruction::ext_inst_import(
+                        non_semantic_debug_info_id,
+                        "NonSemantic.Shader.DebugInfo.100",
+                    )
+                    .to_words(&mut self.logical_layout.ext_inst_imports);
                     self.non_semantic_debug_info_import = Some(non_semantic_debug_info_id);
                 }
                 let source_file_id = self.id_gen.next();
@@ -2426,14 +2429,20 @@ impl Writer {
 
                 match self.non_semantic_debug_info_import {
                     Some(non_semantic_debug_info_import) => {
-                        let (mut instructions, debug_source) = self.debug_source_auto_continued(non_semantic_debug_info_import, debug_info.language, 0, source_file_id, debug_info.source_code);
+                        let (mut instructions, debug_source) = self.debug_source_auto_continued(
+                            non_semantic_debug_info_import,
+                            debug_info.language,
+                            0,
+                            source_file_id,
+                            debug_info.source_code,
+                        );
                         debug_info_inner = Some(DebugInfoInner {
                             source_code: debug_info.source_code,
                             source_file_id,
                             debug_source: Some(debug_source),
                         });
                         self.debugs.append(&mut instructions)
-                    },
+                    }
                     None => {
                         debug_info_inner = Some(DebugInfoInner {
                             source_code: debug_info.source_code,
@@ -2445,7 +2454,7 @@ impl Writer {
                             0,
                             &debug_info_inner,
                         ));
-                    },
+                    }
                 }
             }
         }
@@ -2621,14 +2630,17 @@ impl Writer {
         let mut instructions = vec![];
 
         let words = helpers::string_to_byte_chunks(source, u16::MAX as usize);
-        let string_ids = words.into_iter().map(|string| {
-            let id = self.id_gen.next();
-            let mut string_instruction = Instruction::new(spirv::Op::String);
-            string_instruction.set_result(id);
-            string_instruction.add_operands(helpers::str_bytes_to_words(string));
-            instructions.push(string_instruction);
-            id
-        }).collect::<Vec<_>>();
+        let string_ids = words
+            .into_iter()
+            .map(|string| {
+                let id = self.id_gen.next();
+                let mut string_instruction = Instruction::new(spirv::Op::String);
+                string_instruction.set_result(id);
+                string_instruction.add_operands(helpers::str_bytes_to_words(string));
+                instructions.push(string_instruction);
+                id
+            })
+            .collect::<Vec<_>>();
 
         let mut string_id_iter = string_ids.into_iter();
 
@@ -2637,10 +2649,24 @@ impl Writer {
         let first_string_id = string_id_iter.next();
         let mut operands = vec![file_id];
         operands.extend(first_string_id);
-        Instruction::ext_inst(set_id, /*spirv::DebugInfoOp::DebugSource as u32*/35, self.void_type, source_id, &operands).to_words(&mut self.logical_layout.declarations);
+        Instruction::ext_inst(
+            set_id,
+            /*spirv::DebugInfoOp::DebugSource as u32*/ 35,
+            self.void_type,
+            source_id,
+            &operands,
+        )
+        .to_words(&mut self.logical_layout.declarations);
 
         for string_id in string_id_iter {
-            Instruction::ext_inst(set_id, /*spirv::DebugInfoOp::DebugSourceContinued as u32*/102, self.void_type, source_id, &[string_id]).to_words(&mut self.logical_layout.declarations);
+            Instruction::ext_inst(
+                set_id,
+                /*spirv::DebugInfoOp::DebugSourceContinued as u32*/ 102,
+                self.void_type,
+                source_id,
+                &[string_id],
+            )
+            .to_words(&mut self.logical_layout.declarations);
         }
 
         (instructions, source_id)
