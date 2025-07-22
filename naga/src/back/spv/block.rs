@@ -3,6 +3,7 @@ Implementations for `BlockContext` methods.
 */
 
 use alloc::vec::Vec;
+use core::ops::Range;
 
 use arrayvec::ArrayVec;
 use spirv::Word;
@@ -2942,7 +2943,7 @@ impl BlockContext<'_> {
                 let contained_str = &debug_info.source_code[*span];
                 let line_count: u32 = contained_str.matches("\n").count() as u32;
                 let column_end_offset = contained_str.rfind("\n").map(|dist| (contained_str.len() - dist) as u32).unwrap_or(loc.line_position + loc.length);
-                self.write_line(&mut block, debug_info.source_file_id, debug_info.debug_source, loc.line_number, loc.line_number + line_count, loc.line_position, column_end_offset);
+                self.write_line(&mut block, debug_info.source_file_id, debug_info.debug_source, loc.line_number..(loc.line_number + line_count), loc.line_position..column_end_offset);
             };
             match *statement {
                 Statement::Emit(ref range) => {
@@ -3148,7 +3149,7 @@ impl BlockContext<'_> {
                         let contained_str = &debug_info.source_code[*span];
                         let line_count: u32 = contained_str.matches("\n").count() as u32;
                         let column_end_offset = contained_str.rfind("\n").map(|dist| (contained_str.len() - dist) as u32).unwrap_or(loc.line_position + loc.length);
-                        self.write_line(&mut block, debug_info.source_file_id, debug_info.debug_source, loc.line_number, loc.line_number + line_count, loc.line_position, column_end_offset);       
+                        self.write_line(&mut block, debug_info.source_file_id, debug_info.debug_source, loc.line_number..(loc.line_number + line_count), loc.line_position..column_end_offset);       
                     }
                     block.body.push(Instruction::loop_merge(
                         merge_id,
@@ -3680,13 +3681,13 @@ impl BlockContext<'_> {
         Ok(BlockExitDisposition::Used)
     }
 
-    fn write_line(&mut self, block: &mut Block, file: Word, source: Option<Word>, line_start: u32, line_end: u32, column_start: u32, column_end: u32) {
+    fn write_line(&mut self, block: &mut Block, file: Word, source: Option<Word>, lines: Range<u32>, columns: Range<u32>) {
         match self.writer.non_semantic_debug_info_import {
             Some(non_semantic_debug_info_import) => {
-                let line_start = self.writer.get_constant_scalar(crate::Literal::U32(line_start));
-                let line_end = self.writer.get_constant_scalar(crate::Literal::U32(line_end));
-                let column_start = self.writer.get_constant_scalar(crate::Literal::U32(column_start));
-                let column_end = self.writer.get_constant_scalar(crate::Literal::U32(column_end));
+                let line_start = self.writer.get_constant_scalar(crate::Literal::U32(lines.start));
+                let line_end = self.writer.get_constant_scalar(crate::Literal::U32(lines.end));
+                let column_start = self.writer.get_constant_scalar(crate::Literal::U32(columns.start));
+                let column_end = self.writer.get_constant_scalar(crate::Literal::U32(columns.end));
 
                 // `NonSemantic.Shader.DebugInfo.100` is not yet supported
                 // in the rust bindings.
@@ -3702,8 +3703,8 @@ impl BlockContext<'_> {
             None => {
                 block.body.push(Instruction::line(
                     file,
-                    line_start,
-                    column_start,
+                    lines.start,
+                    columns.start,
                 ));
             }
         }
