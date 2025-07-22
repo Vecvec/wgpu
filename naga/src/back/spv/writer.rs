@@ -2625,7 +2625,7 @@ impl Writer {
             let id = self.id_gen.next();
             let mut string_instruction = Instruction::new(spirv::Op::String);
             string_instruction.set_result(id);
-            string_instruction.add_operands(helpers::bytes_to_words(string));
+            string_instruction.add_operands(helpers::str_bytes_to_words(string));
             instructions.push(string_instruction);
             id
         }).collect::<Vec<_>>();
