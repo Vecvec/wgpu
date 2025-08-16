@@ -762,7 +762,7 @@ impl Writer {
                             .push(Instruction::load(type_id, id, varying_id, None));
                         constituent_ids.push(id);
 
-                        if binding == &crate::Binding::BuiltIn(crate::BuiltIn::GlobalInvocationId) {
+                        if binding == &crate::Binding::BuiltIn(crate::BuiltIn::LocalInvocationId) {
                             local_invocation_id = Some(id);
                         }
                     }
@@ -1248,6 +1248,7 @@ impl Writer {
                         self.request_image_format_capabilities(format.into())?;
                         false
                     }
+                    crate::ImageClass::External => unimplemented!(),
                 };
 
                 match dim {

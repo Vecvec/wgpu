@@ -161,6 +161,13 @@ impl DeviceInterface for CustomDevice {
         unimplemented!()
     }
 
+    fn create_mesh_pipeline(
+        &self,
+        _desc: &wgpu::MeshPipelineDescriptor<'_>,
+    ) -> wgpu::custom::DispatchRenderPipeline {
+        unimplemented!()
+    }
+
     fn create_compute_pipeline(
         &self,
         desc: &wgpu::ComputePipelineDescriptor<'_>,
@@ -181,6 +188,14 @@ impl DeviceInterface for CustomDevice {
     }
 
     fn create_texture(&self, _desc: &wgpu::TextureDescriptor<'_>) -> wgpu::custom::DispatchTexture {
+        unimplemented!()
+    }
+
+    fn create_external_texture(
+        &self,
+        _desc: &wgpu::ExternalTextureDescriptor<'_>,
+        _planes: &[&wgpu::TextureView],
+    ) -> wgpu::custom::DispatchExternalTexture {
         unimplemented!()
     }
 
@@ -225,7 +240,7 @@ impl DeviceInterface for CustomDevice {
         unimplemented!()
     }
 
-    fn on_uncaptured_error(&self, _handler: Box<dyn wgpu::UncapturedErrorHandler>) {
+    fn on_uncaptured_error(&self, _handler: Arc<dyn wgpu::UncapturedErrorHandler>) {
         unimplemented!()
     }
 

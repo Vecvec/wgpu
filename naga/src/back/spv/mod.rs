@@ -280,6 +280,7 @@ impl LocalImageType {
                 flags: make_flags(false, ImageTypeFlags::empty()),
                 image_format: format.into(),
             },
+            crate::ImageClass::External => unimplemented!(),
         }
     }
 }
