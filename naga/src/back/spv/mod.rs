@@ -743,7 +743,10 @@ pub struct Writer {
     /// The set of spirv extensions used.
     extensions_used: crate::FastIndexSet<&'static str>,
 
-    debugs: Vec<Instruction>,
+    /// all OpString, OpSourceExtension, OpSource, and OpSourceContinued, without forward references
+    debug_strings: Vec<Instruction>,
+    /// all OpName and all OpMemberName
+    debug_names: Vec<Instruction>,
     annotations: Vec<Instruction>,
     flags: WriterFlags,
     bounds_check_policies: BoundsCheckPolicies,
@@ -777,6 +780,7 @@ pub struct Writer {
     ray_get_candidate_intersection_function: Option<Word>,
 
     non_semantic_debug_info_import: Option<Word>,
+    last_written_line: Option<(u32, u32)>,
 }
 
 bitflags::bitflags! {

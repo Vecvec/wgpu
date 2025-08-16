@@ -596,6 +596,8 @@ impl<I: Iterator<Item = u32>> super::Frontend<I> {
             workgroup_size: ep.workgroup_size,
             workgroup_size_overrides: None,
             function,
+            // TODO get the span for the entry point (perhaps using the same way we write it out?)
+            span: crate::Span::default(),
         });
 
         Ok(())

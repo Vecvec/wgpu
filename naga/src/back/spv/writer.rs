@@ -4,7 +4,7 @@ use hashbrown::hash_map::Entry;
 use spirv::Word;
 
 use super::{
-    block::DebugInfoInner,
+    block::{DebugInfoInner, NonSemanticDebugInfo},
     helpers::{contains_builtin, global_needs_wrapper, map_storage_class},
     Block, BlockContext, CachedConstant, CachedExpressions, DebugInfo, EntryPointContext, Error,
     Function, FunctionArgument, GlobalVariable, IdGenerator, Instruction, LocalImageType,
@@ -72,7 +72,8 @@ impl Writer {
             capabilities_available: options.capabilities.clone(),
             capabilities_used,
             extensions_used: crate::FastIndexSet::default(),
-            debugs: vec![],
+            debug_strings: vec![],
+            debug_names: vec![],
             annotations: vec![],
             flags: options.flags,
             bounds_check_policies: options.bounds_check_policies,
@@ -93,6 +94,7 @@ impl Writer {
             ray_get_committed_intersection_function: None,
             ray_get_candidate_intersection_function: None,
             non_semantic_debug_info_import: None,
+            last_written_line: None,
         })
     }
 
@@ -139,7 +141,8 @@ impl Writer {
             extensions_used: take(&mut self.extensions_used).recycle(),
             physical_layout: self.physical_layout.clone().recycle(),
             logical_layout: take(&mut self.logical_layout).recycle(),
-            debugs: take(&mut self.debugs).recycle(),
+            debug_strings: take(&mut self.debug_strings).recycle(),
+            debug_names: take(&mut self.debug_names).recycle(),
             annotations: take(&mut self.annotations).recycle(),
             lookup_type: take(&mut self.lookup_type).recycle(),
             lookup_function: take(&mut self.lookup_function).recycle(),
@@ -153,6 +156,7 @@ impl Writer {
             ray_get_candidate_intersection_function: None,
             ray_get_committed_intersection_function: None,
             non_semantic_debug_info_import: None,
+            last_written_line: None,
         };
 
         *self = fresh;
@@ -539,7 +543,7 @@ impl Writer {
                 crate::BinaryOperator::Modulo => "naga_mod",
                 _ => unreachable!(),
             };
-            self.debugs
+            self.debug_names
                 .push(Instruction::name(function_id, function_name));
         }
         let mut function = Function::default();
@@ -558,8 +562,8 @@ impl Writer {
         let lhs_id = self.id_gen.next();
         let rhs_id = self.id_gen.next();
         if self.flags.contains(WriterFlags::DEBUG) {
-            self.debugs.push(Instruction::name(lhs_id, "lhs"));
-            self.debugs.push(Instruction::name(rhs_id, "rhs"));
+            self.debug_names.push(Instruction::name(lhs_id, "lhs"));
+            self.debug_names.push(Instruction::name(rhs_id, "rhs"));
         }
         let left_par = Instruction::function_parameter(left_type_id, lhs_id);
         let right_par = Instruction::function_parameter(right_type_id, rhs_id);
@@ -690,6 +694,7 @@ impl Writer {
         ir_module: &crate::Module,
         mut interface: Option<FunctionInterface>,
         debug_info: &Option<DebugInfoInner>,
+        func_span: crate::Span,
     ) -> Result<Word, Error> {
         self.write_wrapped_functions(ir_function, info, ir_module)?;
 
@@ -781,7 +786,7 @@ impl Writer {
                 let instruction = Instruction::function_parameter(argument_type_id, argument_id);
                 if self.flags.contains(WriterFlags::DEBUG) {
                     if let Some(ref name) = argument.name {
-                        self.debugs.push(Instruction::name(argument_id, name));
+                        self.debug_names.push(Instruction::name(argument_id, name));
                     }
                 }
                 function.parameters.push(FunctionArgument {
@@ -891,8 +896,109 @@ impl Writer {
         let function_id = self.id_gen.next();
         if self.flags.contains(WriterFlags::DEBUG) {
             if let Some(ref name) = ir_function.name {
-                self.debugs.push(Instruction::name(function_id, name));
+                self.debug_names.push(Instruction::name(function_id, name));
             }
+        }
+
+        let mut debug_function = None;
+
+        if let (
+            &Some(DebugInfoInner {
+                non_semantic_info: Some(ref non_semantic_info),
+                ..
+            }),
+            &Some(ref name),
+        ) = (debug_info, &ir_function.name)
+        {
+            let set_id = self.non_semantic_debug_info_import.expect("`debug_info.non_semantic_info` should be `Some` only if non_semantic_debug_info_import is `Some`");
+            let func_type_id = self.id_gen.next();
+            let func_flags =
+                self.get_constant_scalar(crate::Literal::U32(3 /*1<<0 | 1<<1 FlagIsPublic*/));
+            let function_return = ir_function
+                .result
+                .as_ref()
+                .map(|res| {
+                    self.write_debug_type_handle(res.ty, ir_module, debug_info.as_ref().unwrap())
+                })
+                .unwrap_or(Ok(self.void_type))?;
+            let mut func_ty_operands = vec![func_flags, function_return];
+            for arg in &ir_function.arguments {
+                func_ty_operands.push(self.write_debug_type_handle(
+                    arg.ty,
+                    ir_module,
+                    debug_info.as_ref().unwrap(),
+                )?);
+            }
+            Instruction::ext_inst(
+                set_id,
+                /*spirv::DebugInfoOp::DebugTypeFunction as u32*/ 8,
+                self.void_type,
+                func_type_id,
+                &func_ty_operands,
+            )
+            .to_words(&mut self.logical_layout.declarations);
+            let func_name_id = self.id_gen.next();
+            self.debug_strings
+                .push(Instruction::string(name, func_name_id));
+            let loc = func_span.location(debug_info.as_ref().unwrap().source_code);
+            let line = self.get_constant_scalar(crate::Literal::U32(loc.line_number));
+            let column = self.get_constant_scalar(crate::Literal::U32(loc.line_position));
+            let debug_func_id = self.id_gen.next();
+            Instruction::ext_inst(
+                set_id,
+                /*spirv::DebugInfoOp::DebugFunction as u32*/ 20,
+                self.void_type,
+                debug_func_id,
+                &[
+                    func_name_id,
+                    func_type_id,
+                    non_semantic_info.debug_source,
+                    line,
+                    column,
+                    non_semantic_info.compilation_unit,
+                    func_name_id,
+                    func_flags,
+                    line,
+                ],
+            )
+            .to_words(&mut self.logical_layout.declarations);
+
+            debug_function = Some(debug_func_id);
+
+            if interface.is_some() {
+                // TODO: should this have a version
+                let signature_id = self.id_gen.next();
+                self.debug_strings
+                    .push(Instruction::string("Naga", signature_id));
+                let args_id = self.id_gen.next();
+                self.debug_strings
+                    .push(Instruction::string("TODO", args_id));
+                let debug_ep_id = self.id_gen.next();
+                Instruction::ext_inst(
+                    set_id,
+                    /*spirv::DebugInfoOp::DebugEntryPoint as u32*/ 107,
+                    self.void_type,
+                    debug_ep_id,
+                    &[
+                        debug_func_id,
+                        non_semantic_info.compilation_unit,
+                        signature_id,
+                        args_id,
+                    ],
+                )
+                .to_words(&mut self.logical_layout.declarations);
+            }
+
+            prelude.body.insert(
+                0,
+                Instruction::ext_inst(
+                    set_id,
+                    /*spirv::DebugInfoOp::DebugFunctionDefinition as u32*/ 101,
+                    self.void_type,
+                    self.id_gen.next(),
+                    &[debug_func_id, function_id],
+                ),
+            );
         }
 
         let function_type = self.get_function_type(lookup_function_type);
@@ -997,7 +1103,7 @@ impl Writer {
 
             if context.writer.flags.contains(WriterFlags::DEBUG) {
                 if let Some(ref name) = variable.name {
-                    context.writer.debugs.push(Instruction::name(id, name));
+                    context.writer.debug_names.push(Instruction::name(id, name));
                 }
             }
 
@@ -1073,7 +1179,7 @@ impl Writer {
             next_id
         };
 
-        context.write_function_body(main_id, debug_info.as_ref())?;
+        context.write_function_body(main_id, debug_info.as_ref(), func_span, debug_function)?;
 
         // Consume the `BlockContext`, ending its borrows and letting the
         // `Writer` steal back its cached expression table and temp_list.
@@ -1117,6 +1223,7 @@ impl Writer {
                 stage: entry_point.stage,
             }),
             debug_info,
+            entry_point.span,
         )?;
 
         let exec_model = match entry_point.stage {
@@ -1472,7 +1579,7 @@ impl Writer {
 
         if self.flags.contains(WriterFlags::DEBUG) {
             if let Some(ref name) = ty.name {
-                self.debugs.push(Instruction::name(id, name));
+                self.debug_names.push(Instruction::name(id, name));
             }
         }
 
@@ -1573,7 +1680,7 @@ impl Writer {
     ) {
         if self.flags.contains(WriterFlags::DEBUG) {
             if let Some(name) = debug_name {
-                self.debugs.push(Instruction::name(id, name));
+                self.debug_names.push(Instruction::name(id, name));
             }
         }
         let type_id = self.get_numeric_type_id(NumericType::Scalar(value.scalar()));
@@ -1632,7 +1739,7 @@ impl Writer {
     ) {
         if self.flags.contains(WriterFlags::DEBUG) {
             if let Some(name) = debug_name {
-                self.debugs.push(Instruction::name(id, name));
+                self.debug_names.push(Instruction::name(id, name));
             }
         }
         let type_id = self.get_type_id(ty);
@@ -1917,7 +2024,7 @@ impl Writer {
             .contains(WriterFlags::DEBUG | WriterFlags::LABEL_VARYINGS)
         {
             if let Some(name) = debug_name {
-                self.debugs.push(Instruction::name(id, name));
+                self.debug_names.push(Instruction::name(id, name));
             }
         }
 
@@ -2128,7 +2235,7 @@ impl Writer {
 
         if self.flags.contains(WriterFlags::DEBUG) {
             if let Some(ref name) = global_variable.name {
-                self.debugs.push(Instruction::name(id, name));
+                self.debug_names.push(Instruction::name(id, name));
             }
         }
 
@@ -2283,7 +2390,7 @@ impl Writer {
 
         if self.flags.contains(WriterFlags::DEBUG) {
             if let Some(ref name) = member.name {
-                self.debugs
+                self.debug_names
                     .push(Instruction::member_name(struct_id, index as u32, name));
             }
         }
@@ -2423,38 +2530,40 @@ impl Writer {
                     self.non_semantic_debug_info_import = Some(non_semantic_debug_info_id);
                 }
                 let source_file_id = self.id_gen.next();
-                self.debugs.push(Instruction::string(
+                self.debug_strings.push(Instruction::string(
                     &debug_info.file_name.to_string_lossy(),
                     source_file_id,
                 ));
 
                 match self.non_semantic_debug_info_import {
                     Some(non_semantic_debug_info_import) => {
-                        let (mut instructions, debug_source) = self.debug_source_auto_continued(
-                            non_semantic_debug_info_import,
-                            debug_info.language,
-                            0,
-                            source_file_id,
-                            debug_info.source_code,
-                        );
+                        let (mut instructions, non_semantic_info) = self
+                            .debug_source_auto_continued(
+                                non_semantic_debug_info_import,
+                                debug_info.language,
+                                0,
+                                source_file_id,
+                                debug_info.source_code,
+                            );
                         debug_info_inner = Some(DebugInfoInner {
                             source_code: debug_info.source_code,
                             source_file_id,
-                            debug_source: Some(debug_source),
+                            non_semantic_info: Some(non_semantic_info),
                         });
-                        self.debugs.append(&mut instructions)
+                        self.debug_strings.append(&mut instructions)
                     }
                     None => {
                         debug_info_inner = Some(DebugInfoInner {
                             source_code: debug_info.source_code,
                             source_file_id,
-                            debug_source: None,
+                            non_semantic_info: None,
                         });
-                        self.debugs.append(&mut Instruction::source_auto_continued(
-                            debug_info.language,
-                            0,
-                            &debug_info_inner,
-                        ));
+                        self.debug_strings
+                            .append(&mut Instruction::source_auto_continued(
+                                debug_info.language,
+                                0,
+                                &debug_info_inner,
+                            ));
                     }
                 }
             }
@@ -2478,7 +2587,7 @@ impl Writer {
             for (_, constant) in ir_module.constants.iter() {
                 if let Some(ref name) = constant.name {
                     let id = self.constant_ids[constant.init];
-                    self.debugs.push(Instruction::name(id, name));
+                    self.debug_names.push(Instruction::name(id, name));
                 }
             }
         }
@@ -2526,7 +2635,14 @@ impl Writer {
                     continue;
                 }
             }
-            let id = self.write_function(ir_function, info, ir_module, None, &debug_info_inner)?;
+            let id = self.write_function(
+                ir_function,
+                info,
+                ir_module,
+                None,
+                &debug_info_inner,
+                ir_module.functions.get_span(handle),
+            )?;
             self.lookup_function.insert(handle, id);
         }
 
@@ -2562,7 +2678,10 @@ impl Writer {
             .to_words(&mut self.logical_layout.memory_model);
 
         if self.flags.contains(WriterFlags::DEBUG) {
-            for debug in self.debugs.iter() {
+            for debug in self.debug_strings.iter() {
+                debug.to_words(&mut self.logical_layout.debugs);
+            }
+            for debug in self.debug_names.iter() {
                 debug.to_words(&mut self.logical_layout.debugs);
             }
         }
@@ -2617,15 +2736,15 @@ impl Writer {
         Ok(())
     }
 
+    /// Returns a vector of string instructions
     fn debug_source_auto_continued(
         &mut self,
         set_id: Word,
-        //TODO
-        _source_language: spirv::SourceLanguage,
+        source_language: spirv::SourceLanguage,
         _version: u32,
         file_id: Word,
         source: &str,
-    ) -> (Vec<Instruction>, Word) {
+    ) -> (Vec<Instruction>, NonSemanticDebugInfo) {
         use super::helpers;
 
         let mut instructions = vec![];
@@ -2660,17 +2779,366 @@ impl Writer {
         .to_words(&mut self.logical_layout.declarations);
 
         for string_id in string_id_iter {
+            let source_extended_id = self.id_gen.next();
             Instruction::ext_inst(
                 set_id,
                 /*spirv::DebugInfoOp::DebugSourceContinued as u32*/ 102,
                 self.void_type,
-                source_id,
+                source_extended_id,
                 &[string_id],
             )
             .to_words(&mut self.logical_layout.declarations);
         }
 
-        (instructions, source_id)
+        let compilation_id = self.id_gen.next();
+        // 12 is the version of the spirv spec at this time so it *should* be the "version of the SPIRV debug information format"
+        let spirv_version = self.get_constant_scalar(crate::Literal::U32(12));
+
+        // The latest DWARF version is 5.
+        let dwarf_version = self.get_constant_scalar(crate::Literal::U32(5));
+
+        Instruction::ext_inst(
+            set_id,
+            /*spirv::DebugInfoOp::DebugCompilationUnit as u32*/ 1,
+            self.void_type,
+            compilation_id,
+            &[
+                spirv_version,
+                dwarf_version,
+                source_id,
+                source_language as Word,
+            ],
+        )
+        .to_words(&mut self.logical_layout.declarations);
+
+        (
+            instructions,
+            NonSemanticDebugInfo {
+                debug_source: source_id,
+                compilation_unit: compilation_id,
+            },
+        )
+    }
+
+    /// Writes out the type handle as a debug type (not an actual type).
+    ///
+    /// # Panics
+    /// - if `self.non_semantic_debug_info_import` is not `Some`.
+    /// - if `debug_info.non_semantic_info` is not `Some`.
+    /// - if the type is not allowed in a function
+    fn write_debug_type_handle(
+        &mut self,
+        handle: Handle<crate::Type>,
+        ir_module: &crate::Module,
+        debug_info: &DebugInfoInner,
+    ) -> Result<Word, Error> {
+        let ty = &ir_module.types[handle];
+        let mut ty_name = ty.name.clone();
+        if let crate::TypeInner::RayQuery { .. } = ty.inner {
+            let mut name = ty_name.unwrap_or_default();
+            name.insert(0, '@');
+            ty_name = Some(name);
+        }
+        let name = ty_name
+            .as_ref()
+            .map(|str: &String| -> &str { str })
+            .unwrap_or("");
+        let name_id = self.id_gen.next();
+        self.debug_strings.push(Instruction::string(name, name_id));
+        let set_id = self
+            .non_semantic_debug_info_import
+            .expect("`self.non_semantic_debug_info_import` must be set");
+        Ok(match ty.inner {
+            crate::TypeInner::Scalar(scalar) | crate::TypeInner::Atomic(scalar) => {
+                self.write_debug_scalar_type(scalar, name_id)
+            }
+            crate::TypeInner::Vector { size, scalar } => {
+                self.write_debug_vector_type(scalar, size, name_id)
+            }
+            crate::TypeInner::Matrix {
+                columns,
+                rows,
+                scalar,
+            } => {
+                let vector_id = self.write_debug_vector_type(scalar, rows, name_id);
+                let matrix_type_id = self.id_gen.next();
+                let vector_count = self.get_constant_scalar(crate::Literal::U32(columns as u32));
+                let column_major = self.get_constant_scalar(crate::Literal::Bool(true));
+                Instruction::ext_inst(
+                    set_id,
+                    /*spirv::DebugInfoOp::DebugTypeMatrix as u32*/ 108,
+                    self.void_type,
+                    matrix_type_id,
+                    &[vector_id, vector_count, column_major],
+                )
+                .to_words(&mut self.logical_layout.declarations);
+                matrix_type_id
+            }
+            crate::TypeInner::Pointer { base, space } => {
+                let base_ty = self.write_debug_type_handle(base, ir_module, debug_info)?;
+                self.write_debug_ponter_type(base_ty, space)
+            }
+            crate::TypeInner::ValuePointer {
+                size,
+                scalar,
+                space,
+            } => {
+                let base_ty = match size {
+                    Some(size) => self.write_debug_vector_type(scalar, size, name_id),
+                    None => self.write_debug_scalar_type(scalar, name_id),
+                };
+                self.write_debug_ponter_type(base_ty, space)
+            }
+            crate::TypeInner::Array { base, size, .. } => {
+                let base_ty = self.write_debug_type_handle(base, ir_module, debug_info)?;
+                let array_size = match size.resolve(ir_module.to_ctx())? {
+                    crate::proc::IndexableLength::Known(size) => size,
+                    // > If the OpConstant value is set to 0, this indicates an array with an unknown size at compile time which is sized at runtime, corresponding to the SPIR-V OpTypeRuntimeArray type
+                    crate::proc::IndexableLength::Dynamic => 0,
+                };
+                let array_size = self.get_constant_scalar(crate::Literal::U32(array_size));
+                let array_type_id = self.id_gen.next();
+                Instruction::ext_inst(
+                    set_id,
+                    /*spirv::DebugInfoOp::DebugTypeArray as u32*/ 5,
+                    self.void_type,
+                    array_type_id,
+                    &[base_ty, array_size],
+                )
+                .to_words(&mut self.logical_layout.declarations);
+                array_type_id
+            }
+            crate::TypeInner::Struct { ref members, span } => {
+                let struct_tag = self.get_constant_scalar(crate::Literal::U32(1));
+                let src_span = ir_module.types.get_span(handle);
+                let loc = src_span.location(debug_info.source_code);
+                let line = self.get_constant_scalar(crate::Literal::U32(loc.line_number));
+                let column = self.get_constant_scalar(crate::Literal::U32(loc.line_position));
+                let size = self.get_constant_scalar(crate::Literal::U32(span));
+                let non_semantic_info = debug_info
+                    .non_semantic_info
+                    .as_ref()
+                    .expect("`debug_info.non_semantic_info` must be set");
+                let flags = self.get_constant_scalar(crate::Literal::U32(3));
+                let mut operands = vec![
+                    name_id,
+                    struct_tag,
+                    non_semantic_info.debug_source,
+                    line,
+                    column,
+                    non_semantic_info.compilation_unit,
+                    name_id,
+                    size,
+                    flags,
+                ];
+                for member in members {
+                    let member_name_id = self.id_gen.next();
+                    self.debug_strings.push(Instruction::string(
+                        member
+                            .name
+                            .as_ref()
+                            .map(|str: &String| -> &str { str })
+                            .unwrap_or(""),
+                        member_name_id,
+                    ));
+                    let ty = self.write_debug_type_handle(member.ty, ir_module, debug_info)?;
+                    let offset = self.get_constant_scalar(crate::Literal::U32(member.offset));
+                    let member_id = self.id_gen.next();
+                    let size = match ir_module.types[member.ty].inner {
+                        crate::TypeInner::Scalar(scalar) | crate::TypeInner::Atomic(scalar) => {
+                            scalar.width as u32
+                        }
+                        crate::TypeInner::Vector { size, scalar } => {
+                            scalar.width as u32 * size as u32
+                        }
+                        crate::TypeInner::Matrix {
+                            columns,
+                            rows,
+                            scalar,
+                        } => scalar.width as u32 * rows as u32 * columns as u32,
+                        crate::TypeInner::Pointer { .. } => todo!(),
+                        crate::TypeInner::ValuePointer { .. } => todo!(),
+                        crate::TypeInner::Array {
+                            ref size, stride, ..
+                        } => match size.resolve(ir_module.to_ctx())? {
+                            crate::proc::IndexableLength::Known(size) => size * stride,
+                            crate::proc::IndexableLength::Dynamic => unreachable!("type must be allowed in a function"),
+                        },
+                        crate::TypeInner::Struct { span, .. } => span,
+                        crate::TypeInner::Image { .. }
+                        | crate::TypeInner::Sampler { .. }
+                        | crate::TypeInner::AccelerationStructure { .. }
+                        | crate::TypeInner::BindingArray { .. } => {
+                            unreachable!("type must be allowed in a function")
+                        }
+                        crate::TypeInner::RayQuery { .. } => todo!(),
+                    };
+                    let size = self.get_constant_scalar(crate::Literal::U32(size));
+                    Instruction::ext_inst(
+                        set_id,
+                        /*spirv::DebugInfoOp::DebugTypeMember as u32*/ 11,
+                        self.void_type,
+                        member_id,
+                        &[
+                            name_id,
+                            ty,
+                            non_semantic_info.debug_source,
+                            line,
+                            column,
+                            offset,
+                            size,
+                            flags,
+                        ],
+                    )
+                    .to_words(&mut self.logical_layout.declarations);
+                    operands.push(member_id);
+                }
+                let struct_type_id = self.id_gen.next();
+                Instruction::ext_inst(
+                    set_id,
+                    /*spirv::DebugInfoOp::DebugTypeComposite as u32*/ 10,
+                    self.void_type,
+                    struct_type_id,
+                    &operands,
+                )
+                .to_words(&mut self.logical_layout.declarations);
+                struct_type_id
+            }
+
+            crate::TypeInner::RayQuery { .. } => {
+                // > Note: To represent a source language opaque type, this instruction must have no Members operands, Size operand must be DebugInfoNone, and Name must start with @ to avoid clashes with user defined names.
+                let src_span = ir_module.types.get_span(handle);
+                let loc = src_span.location(debug_info.source_code);
+                let line = self.get_constant_scalar(crate::Literal::U32(loc.line_number));
+                let column = self.get_constant_scalar(crate::Literal::U32(loc.line_position));
+                let struct_tag = self.get_constant_scalar(crate::Literal::U32(1));
+                let non_semantic_info = debug_info
+                    .non_semantic_info
+                    .as_ref()
+                    .expect("`debug_info.non_semantic_info` must be set");
+                let flags = self.get_constant_scalar(crate::Literal::U32(3));
+                let struct_type_id = self.id_gen.next();
+                let size = self.id_gen.next();
+                Instruction::ext_inst(
+                    set_id,
+                    /*spirv::DebugInfoOp::DebugInfoNone as u32*/ 0,
+                    size,
+                    set_id,
+                    &[],
+                )
+                .to_words(&mut self.logical_layout.declarations);
+                Instruction::ext_inst(
+                    set_id,
+                    /*spirv::DebugInfoOp::DebugTypeComposite as u32*/ 10,
+                    self.void_type,
+                    struct_type_id,
+                    &[
+                        name_id,
+                        struct_tag,
+                        non_semantic_info.debug_source,
+                        line,
+                        column,
+                        non_semantic_info.compilation_unit,
+                        name_id,
+                        size,
+                        flags,
+                    ],
+                )
+                .to_words(&mut self.logical_layout.declarations);
+                struct_type_id
+            }
+            crate::TypeInner::Image { .. }
+            | crate::TypeInner::Sampler { .. }
+            | crate::TypeInner::AccelerationStructure { .. }
+            | crate::TypeInner::BindingArray { .. } => {
+                unreachable!("type must be allowed in a function")
+            }
+        })
+    }
+
+    fn write_debug_scalar_type(&mut self, scalar: crate::Scalar, name: Word) -> Word {
+        let set_id = self
+            .non_semantic_debug_info_import
+            .expect("`self.non_semantic_debug_info_import` must be set");
+        let basic_ty_id = self.id_gen.next();
+        let scalar_size = self.get_constant_scalar(crate::Literal::U32(scalar.width as u32));
+        let encoding_ty = match scalar.kind {
+            crate::ScalarKind::Sint =>
+            /*Signed*/
+            {
+                4
+            }
+            crate::ScalarKind::Uint =>
+            /*Unsigned*/
+            {
+                6
+            }
+            crate::ScalarKind::Float =>
+            /*Float*/
+            {
+                3
+            }
+            crate::ScalarKind::Bool =>
+            /*Boolean*/
+            {
+                2
+            }
+            crate::ScalarKind::AbstractInt | crate::ScalarKind::AbstractFloat => {
+                unreachable!("Abstract types should never reach the backend")
+            }
+        };
+        let encoding = self.get_constant_scalar(crate::Literal::U32(encoding_ty));
+        let flags = self.get_constant_scalar(crate::Literal::U32(3));
+        Instruction::ext_inst(
+            set_id,
+            /*spirv::DebugInfoOp::DebugTypeBasic as u32*/ 2,
+            self.void_type,
+            basic_ty_id,
+            &[name, scalar_size, encoding, flags],
+        )
+        .to_words(&mut self.logical_layout.declarations);
+        basic_ty_id
+    }
+
+    fn write_debug_vector_type(
+        &mut self,
+        scalar: crate::Scalar,
+        size: crate::VectorSize,
+        name: Word,
+    ) -> Word {
+        let set_id = self
+            .non_semantic_debug_info_import
+            .expect("`self.non_semantic_debug_info_import` must be set");
+        let scalar_id = self.write_debug_scalar_type(scalar, name);
+        let vector_type_id = self.id_gen.next();
+        let component_count = self.get_constant_scalar(crate::Literal::U32(size as u32));
+        Instruction::ext_inst(
+            set_id,
+            /*spirv::DebugInfoOp::DebugTypeVector as u32*/ 6,
+            self.void_type,
+            vector_type_id,
+            &[scalar_id, component_count],
+        )
+        .to_words(&mut self.logical_layout.declarations);
+        vector_type_id
+    }
+    fn write_debug_ponter_type(&mut self, base: Word, space: crate::AddressSpace) -> Word {
+        let set_id = self
+            .non_semantic_debug_info_import
+            .expect("`self.non_semantic_debug_info_import` must be set");
+        let pointer_type_id = self.id_gen.next();
+        let empty_flags = self.get_constant_scalar(crate::Literal::U32(0));
+        let storage_class =
+            self.get_constant_scalar(crate::Literal::U32(map_storage_class(space) as u32));
+        Instruction::ext_inst(
+            set_id,
+            /*spirv::DebugInfoOp::DebugTypePointer as u32*/ 3,
+            self.void_type,
+            pointer_type_id,
+            &[base, storage_class, empty_flags],
+        )
+        .to_words(&mut self.logical_layout.declarations);
+        pointer_type_id
     }
 }
 

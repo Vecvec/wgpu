@@ -2314,6 +2314,9 @@ pub struct EntryPoint {
     pub workgroup_size_overrides: Option<[Option<Handle<Expression>>; 3]>,
     /// The entrance function.
     pub function: Function,
+    /// The span of this entry point. Same as
+    #[cfg_attr(feature = "serialize", serde(skip))]
+    pub span: crate::Span,
 }
 
 /// Return types predeclared for the frexp, modf, and atomicCompareExchangeWeak built-in functions.

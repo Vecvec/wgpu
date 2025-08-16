@@ -148,7 +148,14 @@ pub(crate) struct DebugInfoInner<'a> {
     pub source_code: &'a str,
     pub source_file_id: Word,
     /// The `DebugSource` if `NonSemantic.Shader.DebugInfo.100` is enabled, otherwise, `None`
-    pub debug_source: Option<Word>,
+    pub non_semantic_info: Option<NonSemanticDebugInfo>,
+}
+
+#[derive(Debug, Copy, Clone)]
+/// Addition debug info when using `NonSemantic.Shader.DebugInfo.100`
+pub(crate) struct NonSemanticDebugInfo {
+    pub debug_source: Word,
+    pub compilation_unit: Word,
 }
 
 impl Writer {
@@ -304,7 +311,7 @@ impl BlockContext<'_> {
         let loop_counter_var_id = self.gen_id();
         if self.writer.flags.contains(WriterFlags::DEBUG) {
             self.writer
-                .debugs
+                .debug_names
                 .push(Instruction::name(loop_counter_var_id, "loop_bound"));
         }
         let var = super::LocalVariable {
@@ -2924,8 +2931,53 @@ impl BlockContext<'_> {
         exit: BlockExit,
         loop_context: LoopContext,
         debug_info: Option<&DebugInfoInner>,
+        span: crate::Span,
+        debug_parent: Option<Word>,
     ) -> Result<BlockExitDisposition, Error> {
         let mut block = Block::new(label_id);
+        let mut new_debug_parent = None;
+        if let Some(
+            debug_info @ &DebugInfoInner {
+                non_semantic_info: Some(non_semantic_info),
+                ..
+            },
+        ) = debug_info
+        {
+            let loc: crate::SourceLocation = span.location(debug_info.source_code);
+            let set_id = self
+                .writer
+                .non_semantic_debug_info_import
+                .expect("`self.non_semantic_debug_info_import` must be set");
+            let lexical_block_id = self.gen_id();
+            let line = self
+                .writer
+                .get_constant_scalar(crate::Literal::U32(loc.line_number));
+            let column = self
+                .writer
+                .get_constant_scalar(crate::Literal::U32(loc.line_position));
+            Instruction::ext_inst(
+                set_id,
+                /*spirv::DebugInfoOp::DebugLexicalBlock as u32*/ 21,
+                self.writer.void_type,
+                lexical_block_id,
+                &[
+                    non_semantic_info.debug_source,
+                    line,
+                    column,
+                    debug_parent.unwrap(),
+                ],
+            )
+            .to_words(&mut self.writer.logical_layout.declarations);
+            let scope_id = self.gen_id();
+            block.body.push(Instruction::ext_inst(
+                set_id,
+                /*spirv::DebugInfoOp::DebugScope as u32*/ 23,
+                self.writer.void_type,
+                scope_id,
+                &[lexical_block_id],
+            ));
+            new_debug_parent = Some(lexical_block_id);
+        }
         for (statement, span) in naga_block.span_iter() {
             if let (Some(debug_info), false) = (
                 debug_info,
@@ -2949,7 +3001,7 @@ impl BlockContext<'_> {
                 self.write_line(
                     &mut block,
                     debug_info.source_file_id,
-                    debug_info.debug_source,
+                    debug_info.non_semantic_info,
                     loc.line_number..(loc.line_number + line_count),
                     loc.line_position..column_end_offset,
                 );
@@ -2974,6 +3026,8 @@ impl BlockContext<'_> {
                         BlockExit::Branch { target: merge_id },
                         loop_context,
                         debug_info,
+                        *span,
+                        new_debug_parent,
                     )?;
 
                     match merge_used {
@@ -3035,6 +3089,8 @@ impl BlockContext<'_> {
                                 BlockExit::Branch { target: merge_id },
                                 loop_context,
                                 debug_info,
+                                *span,
+                                new_debug_parent,
                             )?;
                         }
                         if let Some(block_id) = reject_id {
@@ -3048,6 +3104,8 @@ impl BlockContext<'_> {
                                 BlockExit::Branch { target: merge_id },
                                 loop_context,
                                 debug_info,
+                                *span,
+                                new_debug_parent,
                             )?;
                         }
 
@@ -3137,6 +3195,8 @@ impl BlockContext<'_> {
                             },
                             inner_context,
                             debug_info,
+                            *span,
+                            new_debug_parent,
                         )?;
                     }
 
@@ -3171,7 +3231,7 @@ impl BlockContext<'_> {
                         self.write_line(
                             &mut block,
                             debug_info.source_file_id,
-                            debug_info.debug_source,
+                            debug_info.non_semantic_info,
                             loc.line_number..(loc.line_number + line_count),
                             loc.line_position..column_end_offset,
                         );
@@ -3201,6 +3261,8 @@ impl BlockContext<'_> {
                             break_id: Some(merge_id),
                         },
                         debug_info,
+                        *span,
+                        new_debug_parent,
                     )?;
 
                     let exit = match break_if {
@@ -3225,6 +3287,8 @@ impl BlockContext<'_> {
                             break_id: Some(merge_id),
                         },
                         debug_info,
+                        *span,
+                        new_debug_parent,
                     )?;
 
                     block = Block::new(merge_id);
@@ -3710,10 +3774,14 @@ impl BlockContext<'_> {
         &mut self,
         block: &mut Block,
         file: Word,
-        source: Option<Word>,
+        source: Option<NonSemanticDebugInfo>,
         lines: Range<u32>,
         columns: Range<u32>,
     ) {
+        if Some((lines.start, columns.start)) == self.writer.last_written_line {
+            return;
+        }
+        self.writer.last_written_line = Some((lines.start, columns.start));
         match self.writer.non_semantic_debug_info_import {
             Some(non_semantic_debug_info_import) => {
                 let line_start = self
@@ -3738,9 +3806,9 @@ impl BlockContext<'_> {
                     self.writer.void_type,
                     self.gen_id(),
                     &[
-                        source.expect(
+                        source.as_ref().expect(
                             "source must be written out if using `non_semantic_debug_info_import`",
-                        ),
+                        ).debug_source,
                         line_start,
                         line_end,
                         column_start,
@@ -3760,6 +3828,8 @@ impl BlockContext<'_> {
         &mut self,
         entry_id: Word,
         debug_info: Option<&DebugInfoInner>,
+        span: crate::Span,
+        debug_function: Option<Word>,
     ) -> Result<(), Error> {
         // We can ignore the `BlockExitDisposition` returned here because
         // `BlockExit::Return` doesn't refer to a block.
@@ -3769,7 +3839,34 @@ impl BlockContext<'_> {
             BlockExit::Return,
             LoopContext::default(),
             debug_info,
+            span,
+            debug_function,
         )?;
+
+        if let Some(&DebugInfoInner {
+            non_semantic_info: Some(_),
+            ..
+        }) = debug_info
+        {
+            let set_id = self
+                .writer
+                .non_semantic_debug_info_import
+                .expect("`self.non_semantic_debug_info_import` must be set");
+            let no_scope_id = self.gen_id();
+            if let Some(last) = self.function.blocks.last_mut()
+            {
+                //Not sure why this is legal, but DXC does it too.
+                last.body.push(
+                    Instruction::ext_inst(
+                        set_id,
+                        /*spirv::DebugInfoOp::DebugNoScope as u32*/ 24,
+                        self.writer.void_type,
+                        no_scope_id,
+                        &[],
+                    ),
+                )
+            }
+        }
 
         Ok(())
     }

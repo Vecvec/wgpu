@@ -1377,6 +1377,8 @@ impl Frontend {
                 result: ty.map(|ty| FunctionResult { ty, binding: None }),
                 ..Default::default()
             },
+            // TODO get the span for the entry point
+            span: Span::default(),
         });
 
         Ok(())

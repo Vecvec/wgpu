@@ -1527,6 +1527,7 @@ impl<'source, 'temp> Lowerer<'source, 'temp> {
                 workgroup_size,
                 workgroup_size_overrides,
                 function,
+                span,
             });
             Ok(LoweredGlobalDecl::EntryPoint(
                 ctx.module.entry_points.len() - 1,
