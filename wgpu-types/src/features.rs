@@ -990,13 +990,14 @@ bitflags_array! {
         ///
         /// This is a native-only feature.
         const EXPERIMENTAL_RAY_QUERY = 1 << 32;
-        /// Enables 64-bit floating point types in SPIR-V shaders.
+        /// Enables 64-bit floating point types in SPIR-V shaders and wgsl shaders.
         ///
         /// Note: even when supported by GPU hardware, 64-bit floating point operations are
         /// frequently between 16 and 64 _times_ slower than equivalent operations on 32-bit floats.
         ///
         /// Supported Platforms:
         /// - Vulkan
+        /// - DX12
         ///
         /// This is a native only feature.
         const SHADER_F64 = 1 << 33;

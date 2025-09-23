@@ -382,6 +382,8 @@ impl super::Adapter {
                 != Direct3D12::D3D12_CONSERVATIVE_RASTERIZATION_TIER_NOT_SUPPORTED,
         );
 
+        features.set(wgt::Features::SHADER_F64, options.DoublePrecisionFloatShaderOps.as_bool());
+
         features.set(
             wgt::Features::TEXTURE_BINDING_ARRAY
                 | wgt::Features::STORAGE_RESOURCE_BINDING_ARRAY
