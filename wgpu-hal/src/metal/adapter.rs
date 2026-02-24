@@ -55,6 +55,37 @@ impl crate::Adapter for super::Adapter {
             .newCommandQueueWithMaxCommandBufferCount(MAX_COMMAND_BUFFERS)
             .unwrap();
 
+        // Signal the acceleration structure fence so it can be unconditionally waited on later.
+        let mut acceleration_structure_fence = None;
+        if features.contains(wgt::Features::EXPERIMENTAL_RAY_QUERY) {
+            let mut err = Ok(());
+            autoreleasepool(|_| {
+                let Ok(fence) = self
+                    .shared
+                    .device
+                    .newFence() else {
+                        err = Err(crate::DeviceError::OutOfMemory);
+                    };
+
+                let Ok(buf) = queue
+                    .commandBuffer() else {
+                        err = Err(crate::DeviceError::OutOfMemory);
+                    };
+
+                let Ok(enc) = cmd_buf.accelerationStructureCommandEncoder() else {
+                        err = Err(crate::DeviceError::OutOfMemory);
+                    };
+
+                enc.updateFence(fence.as_ref());
+
+                enc.endEncoding();
+                buf.commit();
+
+                acceleration_structure_fence = Some(fence);
+            });
+            err?;
+        }
+
         // Acquiring the meaning of timestamp ticks is hard with Metal!
         // The only thing there is a method correlating cpu & gpu timestamps (`device.sample_timestamps`).
         // Users are supposed to call this method twice and calculate the difference,
@@ -86,6 +117,7 @@ impl crate::Adapter for super::Adapter {
                 shared: Arc::clone(&self.shared),
                 features,
                 counters: Default::default(),
+                acceleration_structure_fence,
             },
             queue: super::Queue {
                 raw: Arc::new(Mutex::new(queue)),

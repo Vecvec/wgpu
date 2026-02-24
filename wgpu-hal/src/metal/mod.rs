@@ -436,6 +436,7 @@ pub struct Device {
     shared: Arc<AdapterShared>,
     features: wgt::Features,
     counters: Arc<wgt::HalCounters>,
+    acceleration_structure_fence: Option<Retained<ProtocolObject<dyn MTLFence>>>,
 }
 
 pub struct Surface {
@@ -1041,6 +1042,7 @@ pub struct CommandEncoder {
     state: CommandState,
     temp: Temp,
     counters: Arc<wgt::HalCounters>,
+    acceleration_structure_fence: Option<Retained<ProtocolObject<dyn MTLFence>>>,
 }
 
 impl fmt::Debug for CommandEncoder {

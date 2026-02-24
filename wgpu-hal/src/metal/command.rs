@@ -679,6 +679,9 @@ impl crate::CommandEncoder for super::CommandEncoder {
         copy: wgt::AccelerationStructureCopy,
     ) {
         let command_encoder = self.enter_acceleration_structure_builder();
+        let fence = self.acceleration_structure_fence.as_ref().unwrap();
+        command_encoder.waitForFence(fence);
+
         match copy {
             wgt::AccelerationStructureCopy::Clone => unsafe {
                 command_encoder
@@ -690,6 +693,9 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 );
             }
         };
+        
+        command_encoder.updateFence(fence);
+        self.leave_acceleration_structure_builder();
     }
 
     unsafe fn begin_query(&mut self, set: &super::QuerySet, index: u32) {
@@ -1775,6 +1781,9 @@ impl crate::CommandEncoder for super::CommandEncoder {
         >,
     {
         let command_encoder = self.enter_acceleration_structure_builder();
+        let fence = self.acceleration_structure_fence.as_ref().unwrap();
+        command_encoder.waitForFence(fence);
+
         for descriptor in descriptors {
             let acceleration_structure_descriptor =
                 conv::map_acceleration_structure_descriptor(descriptor.entries, descriptor.flags);
@@ -1799,6 +1808,9 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 },
             }
         }
+
+        command_encoder.updateFence(fence);
+        self.leave_acceleration_structure_builder();
     }
 
     unsafe fn place_acceleration_structure_barrier(
