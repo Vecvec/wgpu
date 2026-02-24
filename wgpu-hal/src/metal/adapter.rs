@@ -1,9 +1,9 @@
-use objc2::{available, runtime::ProtocolObject};
+use objc2::{available, runtime::ProtocolObject, rc::autoreleasepool};
 use objc2_foundation::{NSOperatingSystemVersion, NSProcessInfo};
 use objc2_metal::{
     MTLArgumentBuffersTier, MTLCounterSamplingPoint, MTLDevice, MTLFeatureSet, MTLGPUFamily,
     MTLIndirectAccelerationStructureInstanceDescriptor, MTLLanguageVersion, MTLPixelFormat,
-    MTLReadWriteTextureTier,
+    MTLReadWriteTextureTier, MTLFence,
 };
 use parking_lot::Mutex;
 use wgt::{AstcBlock, AstcChannel};
@@ -72,7 +72,7 @@ impl crate::Adapter for super::Adapter {
                         err = Err(crate::DeviceError::OutOfMemory);
                     };
 
-                let Ok(enc) = cmd_buf.accelerationStructureCommandEncoder() else {
+                let Ok(enc) = buf.accelerationStructureCommandEncoder() else {
                         err = Err(crate::DeviceError::OutOfMemory);
                     };
 
