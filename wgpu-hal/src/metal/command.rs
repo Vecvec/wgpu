@@ -693,7 +693,7 @@ impl crate::CommandEncoder for super::CommandEncoder {
                 );
             }
         };
-        
+
         command_encoder.updateFence(fence);
         self.leave_acceleration_structure_builder();
     }

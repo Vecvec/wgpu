@@ -684,7 +684,9 @@ impl crate::Device for super::Device {
             state: super::CommandState::default(),
             temp: super::Temp::default(),
             counters: Arc::clone(&self.counters),
-            acceleration_structure_fence: Option::<Retained<_>>::clone(&self.acceleration_structure_fence),
+            acceleration_structure_fence: Option::<Retained<_>>::clone(
+                &self.acceleration_structure_fence,
+            ),
         })
     }
 

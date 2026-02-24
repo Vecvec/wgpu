@@ -47,11 +47,11 @@ use objc2_metal::{
     MTLAccelerationStructure, MTLAccelerationStructureCommandEncoder, MTLArgumentBuffersTier,
     MTLBlitCommandEncoder, MTLBuffer, MTLCommandBuffer, MTLCommandBufferStatus, MTLCommandQueue,
     MTLComputeCommandEncoder, MTLComputePipelineState, MTLCounterSampleBuffer, MTLCullMode,
-    MTLDepthClipMode, MTLDepthStencilState, MTLDevice, MTLDrawable, MTLIndexType,
+    MTLDepthClipMode, MTLDepthStencilState, MTLDevice, MTLDrawable, MTLFence, MTLIndexType,
     MTLLanguageVersion, MTLLibrary, MTLPrimitiveType, MTLReadWriteTextureTier,
     MTLRenderCommandEncoder, MTLRenderPipelineState, MTLRenderStages, MTLResource,
     MTLResourceUsage, MTLSamplerState, MTLSharedEvent, MTLSize, MTLTexture, MTLTextureType,
-    MTLTriangleFillMode, MTLWinding, MTLFence,
+    MTLTriangleFillMode, MTLWinding,
 };
 use objc2_quartz_core::CAMetalLayer;
 use parking_lot::{Mutex, RwLock};

@@ -1,9 +1,9 @@
-use objc2::{available, runtime::ProtocolObject, rc::autoreleasepool};
+use objc2::{available, rc::autoreleasepool, runtime::ProtocolObject};
 use objc2_foundation::{NSOperatingSystemVersion, NSProcessInfo};
 use objc2_metal::{
-    MTLArgumentBuffersTier, MTLCounterSamplingPoint, MTLDevice, MTLFeatureSet, MTLGPUFamily,
-    MTLIndirectAccelerationStructureInstanceDescriptor, MTLLanguageVersion, MTLPixelFormat,
-    MTLReadWriteTextureTier, MTLFence,
+    MTLArgumentBuffersTier, MTLCounterSamplingPoint, MTLDevice, MTLFeatureSet, MTLFence,
+    MTLGPUFamily, MTLIndirectAccelerationStructureInstanceDescriptor, MTLLanguageVersion,
+    MTLPixelFormat, MTLReadWriteTextureTier,
 };
 use parking_lot::Mutex;
 use wgt::{AstcBlock, AstcChannel};
@@ -60,21 +60,17 @@ impl crate::Adapter for super::Adapter {
         if features.contains(wgt::Features::EXPERIMENTAL_RAY_QUERY) {
             let mut err = Ok(());
             autoreleasepool(|_| {
-                let Ok(fence) = self
-                    .shared
-                    .device
-                    .newFence() else {
-                        err = Err(crate::DeviceError::OutOfMemory);
-                    };
+                let Ok(fence) = self.shared.device.newFence() else {
+                    err = Err(crate::DeviceError::OutOfMemory);
+                };
 
-                let Ok(buf) = queue
-                    .commandBuffer() else {
-                        err = Err(crate::DeviceError::OutOfMemory);
-                    };
+                let Ok(buf) = queue.commandBuffer() else {
+                    err = Err(crate::DeviceError::OutOfMemory);
+                };
 
                 let Ok(enc) = buf.accelerationStructureCommandEncoder() else {
-                        err = Err(crate::DeviceError::OutOfMemory);
-                    };
+                    err = Err(crate::DeviceError::OutOfMemory);
+                };
 
                 enc.updateFence(fence.as_ref());
 
