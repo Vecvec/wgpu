@@ -589,7 +589,7 @@ jobs:
 
           # Mac
           - name: Mac aarch64
-            os: macos-14
+            os: macos-15
 
           # Linux
           - name: Linux x86_64
