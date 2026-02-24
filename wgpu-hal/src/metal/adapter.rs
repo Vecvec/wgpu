@@ -62,14 +62,17 @@ impl crate::Adapter for super::Adapter {
             autoreleasepool(|_| {
                 let Ok(fence) = self.shared.device.newFence() else {
                     err = Err(crate::DeviceError::OutOfMemory);
+                    return;
                 };
 
                 let Ok(buf) = queue.commandBuffer() else {
                     err = Err(crate::DeviceError::OutOfMemory);
+                    return;
                 };
 
                 let Ok(enc) = buf.accelerationStructureCommandEncoder() else {
                     err = Err(crate::DeviceError::OutOfMemory);
+                    return;
                 };
 
                 enc.updateFence(fence.as_ref());

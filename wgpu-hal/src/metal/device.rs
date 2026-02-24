@@ -14,14 +14,14 @@ use objc2_metal::{
     MTLCaptureManager, MTLCaptureScope, MTLCommandBuffer, MTLCommandBufferStatus,
     MTLCompileOptions, MTLComputePipelineDescriptor, MTLComputePipelineState,
     MTLCounterSampleBufferDescriptor, MTLCounterSet, MTLDepthClipMode, MTLDepthStencilDescriptor,
-    MTLDevice, MTLFunction, MTLIndirectAccelerationStructureInstanceDescriptor, MTLLanguageVersion,
-    MTLLibrary, MTLMeshRenderPipelineDescriptor, MTLMutability, MTLPackedFloat3, MTLPackedFloat4x3,
-    MTLPipelineBufferDescriptorArray, MTLPixelFormat, MTLPrimitiveTopologyClass,
-    MTLRenderPipelineColorAttachmentDescriptorArray, MTLRenderPipelineDescriptor, MTLResource,
-    MTLResourceID, MTLResourceOptions, MTLSamplerAddressMode, MTLSamplerDescriptor,
-    MTLSamplerMipFilter, MTLSamplerState, MTLSize, MTLStencilDescriptor, MTLStorageMode,
-    MTLTexture, MTLTextureDescriptor, MTLTextureType, MTLTriangleFillMode, MTLVertexDescriptor,
-    MTLVertexStepFunction,
+    MTLDevice, MTLFence, MTLFunction, MTLIndirectAccelerationStructureInstanceDescriptor,
+    MTLLanguageVersion, MTLLibrary, MTLMeshRenderPipelineDescriptor, MTLMutability,
+    MTLPackedFloat3, MTLPackedFloat4x3, MTLPipelineBufferDescriptorArray, MTLPixelFormat,
+    MTLPrimitiveTopologyClass, MTLRenderPipelineColorAttachmentDescriptorArray,
+    MTLRenderPipelineDescriptor, MTLResource, MTLResourceID, MTLResourceOptions,
+    MTLSamplerAddressMode, MTLSamplerDescriptor, MTLSamplerMipFilter, MTLSamplerState, MTLSize,
+    MTLStencilDescriptor, MTLStorageMode, MTLTexture, MTLTextureDescriptor, MTLTextureType,
+    MTLTriangleFillMode, MTLVertexDescriptor, MTLVertexStepFunction,
 };
 
 use super::{conv, PassthroughShader, ShaderModuleSource};
@@ -370,14 +370,17 @@ impl super::Device {
         }
     }
 
+    /// `acceleration_structure_fence` must be some if ray queries are enabled in features.
     pub unsafe fn device_from_raw(
         raw: Retained<ProtocolObject<dyn MTLDevice>>,
         features: wgt::Features,
+        acceleration_structure_fence: Option<Retained<ProtocolObject<dyn MTLFence>>>,
     ) -> super::Device {
         super::Device {
             shared: Arc::new(super::AdapterShared::new(raw)),
             features,
             counters: Default::default(),
+            acceleration_structure_fence,
         }
     }
 
