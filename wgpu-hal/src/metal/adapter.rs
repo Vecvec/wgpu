@@ -2,9 +2,9 @@ use objc2::{available, rc::autoreleasepool, runtime::ProtocolObject};
 use objc2_foundation::{NSOperatingSystemVersion, NSProcessInfo};
 use objc2_metal::{
     MTLAccelerationStructureCommandEncoder, MTLArgumentBuffersTier, MTLCommandBuffer,
-    MTLCommandQueue, MTLCounterSamplingPoint, MTLDevice, MTLFeatureSet, MTLGPUFamily,
-    MTLIndirectAccelerationStructureInstanceDescriptor, MTLLanguageVersion, MTLPixelFormat,
-    MTLReadWriteTextureTier,
+    MTLCommandEncoder, MTLCommandQueue, MTLCounterSamplingPoint, MTLDevice, MTLFeatureSet,
+    MTLGPUFamily, MTLIndirectAccelerationStructureInstanceDescriptor, MTLLanguageVersion,
+    MTLPixelFormat, MTLReadWriteTextureTier,
 };
 use parking_lot::Mutex;
 use wgt::{AstcBlock, AstcChannel};
