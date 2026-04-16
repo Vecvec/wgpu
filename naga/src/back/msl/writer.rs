@@ -540,6 +540,7 @@ pub struct Writer<W> {
     /// padding inserted **before** them (i.e. between fields at index - 1 and index)
     pub(super) struct_member_pads: FastHashSet<(Handle<crate::Type>, u32)>,
     pub(super) needs_object_memory_barriers: bool,
+    pub(super) ray_query_initialization_tracking: bool,
 }
 
 impl crate::Scalar {
@@ -718,12 +719,12 @@ impl crate::Type {
 }
 
 #[derive(Clone, Copy)]
-enum FunctionOrigin {
+pub(super) enum FunctionOrigin {
     Handle(Handle<crate::Function>),
     EntryPoint(proc::EntryPointIndex),
 }
 
-trait NameKeyExt {
+pub(super) trait NameKeyExt {
     fn local(origin: FunctionOrigin, local_handle: Handle<crate::LocalVariable>) -> NameKey {
         match origin {
             FunctionOrigin::Handle(handle) => NameKey::FunctionLocal(handle, local_handle),
@@ -778,7 +779,7 @@ struct TexelAddress {
 
 pub(super) struct ExpressionContext<'a> {
     pub(super) function: &'a crate::Function,
-    origin: FunctionOrigin,
+    pub(super) origin: FunctionOrigin,
     pub(super) info: &'a valid::FunctionInfo,
     pub(super) module: &'a crate::Module,
     pub(super) mod_info: &'a valid::ModuleInfo,
@@ -890,6 +891,7 @@ impl<W: Write> Writer<W> {
             put_block_stack_pointers: Default::default(),
             struct_member_pads: FastHashSet::default(),
             needs_object_memory_barriers: false,
+            ray_query_initialization_tracking: true,
         }
     }
 
@@ -1106,6 +1108,18 @@ impl<W: Write> Writer<W> {
                 }
             };
             writeln!(self.out, ";")?;
+
+            // If this variable is a ray query, put in an initialization tracker.
+
+            if let crate::TypeInner::RayQuery { .. } = context.module.types[ty].inner {
+                writeln!(
+                    self.out,
+                    "{}uint {}{} = 0u;",
+                    back::INDENT,
+                    super::ray::RAY_QUERY_TRACKER_VARIABLE_PREFIX,
+                    self.names[&name_key]
+                )?;
+            }
         }
         Ok(())
     }
@@ -4309,6 +4323,7 @@ impl<W: Write> Writer<W> {
             &[
                 CLAMPED_LOD_LOAD_PREFIX,
                 super::ray::INTERSECTION_FUNCTION_NAME,
+                super::ray::RAY_QUERY_TRACKER_VARIABLE_PREFIX,
             ],
             &mut self.names,
         );
