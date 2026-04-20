@@ -76,6 +76,16 @@ RayIntersection query_loop(
             )
         );
         params.accept_any_intersection((desc.flags & 4) != 0);
+        params.set_geometry_cull_mode(
+            (desc.flags & 256) != 0 ? metal::raytracing::geometry_cull_mode::triangle : (
+                (desc.flags & 512) != 0 ? metal::raytracing::geometry_cull_mode::bounding_box : metal::raytracing::geometry_cull_mode::none
+            )
+        );
+        params.set_triangle_cull_mode(
+            (desc.flags & 16) != 0 ? metal::raytracing::triangle_cull_mode::front : (
+                (desc.flags & 32) != 0 ? metal::raytracing::triangle_cull_mode::back : metal::raytracing::triangle_cull_mode::none
+            )
+        );
         metal::raytracing::ray ray = metal::raytracing::ray(desc.origin, desc.dir, desc.tmin, desc.tmax);
         rq_1.reset(ray,acs, desc.cull_mask, params);
     }
@@ -161,6 +171,16 @@ RayIntersection ray_query_get_intersection_false(metal::raytracing::intersection
             )
         );
         params.accept_any_intersection((desc.flags & 4) != 0);
+        params.set_geometry_cull_mode(
+            (desc.flags & 256) != 0 ? metal::raytracing::geometry_cull_mode::triangle : (
+                (desc.flags & 512) != 0 ? metal::raytracing::geometry_cull_mode::bounding_box : metal::raytracing::geometry_cull_mode::none
+            )
+        );
+        params.set_triangle_cull_mode(
+            (desc.flags & 16) != 0 ? metal::raytracing::triangle_cull_mode::front : (
+                (desc.flags & 32) != 0 ? metal::raytracing::triangle_cull_mode::back : metal::raytracing::triangle_cull_mode::none
+            )
+        );
         metal::raytracing::ray ray = metal::raytracing::ray(desc.origin, desc.dir, desc.tmin, desc.tmax);
         rq.reset(ray,acc_struct, desc.cull_mask, params);
     }
