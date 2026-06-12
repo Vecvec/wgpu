@@ -1170,8 +1170,20 @@ fn build_blas<'a>(
         }
     }
 
+    if !blas_s_for_compaction.is_empty() {
+        unsafe {
+            cmd_buf_raw.place_acceleration_structure_barrier(hal::AccelerationStructureBarrier {
+                usage: hal::StateTransition {
+                    from: hal::AccelerationStructureUses::BUILD_OUTPUT,
+                    to: hal::AccelerationStructureUses::QUERY_INPUT,
+                },
+            });
+        }
+    }
+
     let mut source_usage = hal::AccelerationStructureUses::empty();
     let mut destination_usage = hal::AccelerationStructureUses::empty();
+
     for &(buf, blas) in blas_s_for_compaction.iter() {
         unsafe {
             cmd_buf_raw.transition_buffers(&[hal::BufferBarrier {
