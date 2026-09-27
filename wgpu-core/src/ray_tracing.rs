@@ -209,6 +209,9 @@ pub enum BuildAccelerationStructureError {
 
     #[error("Blas {0:?} AABB stride is invalid (must be >= {1} and a multiple of 8)")]
     InvalidAabbStride(ResourceErrorIdent, BufferAddress),
+
+    #[error("Tlas instance has invalid flags {0:?}")]
+    TlasInstanceFlagsInvalid(wgt::AccelerationStructureInstanceFlags),
 }
 
 impl WebGpuError for BuildAccelerationStructureError {
@@ -245,7 +248,8 @@ impl WebGpuError for BuildAccelerationStructureError {
             | Self::BlasGeometryKindMismatch(..)
             | Self::IncompatibleBlasAabbPrimitiveCount(..)
             | Self::UnalignedAabbPrimitiveOffset(..)
-            | Self::InvalidAabbStride(..) => ErrorType::Validation,
+            | Self::InvalidAabbStride(..)
+            | Self::TlasInstanceFlagsInvalid(..) => ErrorType::Validation,
         }
     }
 }
@@ -407,6 +411,7 @@ pub struct OwnedTlasInstance<R: ReferenceType> {
     pub transform: [f32; 12],
     pub custom_data: u32,
     pub mask: u8,
+    pub flags: wgt::AccelerationStructureInstanceFlags,
 }
 
 pub type ArcTlasInstance = OwnedTlasInstance<ArcReferences>;
