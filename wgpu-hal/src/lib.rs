@@ -1257,6 +1257,12 @@ pub trait Device: WasmNotSendSync {
         &self,
         desc: &AccelerationStructureDescriptor,
     ) -> Result<<Self::A as Api>::AccelerationStructure, DeviceError>;
+    /// # Safety
+    /// 
+    /// if desc.entries is [`AccelerationStructureEntries::Triangles`] or [`AccelerationStructureEntries::AABBs`]
+    /// then the vector contained within that must have a length which is
+    /// 1. greater than zero
+    /// 2. less than the `max_blas_geometry_count` limit on the device.
     unsafe fn get_acceleration_structure_build_sizes(
         &self,
         desc: &GetAccelerationStructureBuildSizesDescriptor<<Self::A as Api>::Buffer>,

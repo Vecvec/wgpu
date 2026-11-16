@@ -47,6 +47,8 @@ pub enum CreateBlasError {
         "Limit `max_blas_primitive_count` is {0}, but the BLAS had a maximum of {1} primitives"
     )]
     TooManyPrimitives(u32, u32),
+    #[error("BLAS created with no geometries")]
+    ZeroGeometries,
 }
 
 impl WebGpuError for CreateBlasError {
@@ -57,7 +59,8 @@ impl WebGpuError for CreateBlasError {
             Self::MissingIndexData
             | Self::InvalidVertexFormat(..)
             | Self::TooManyGeometries(..)
-            | Self::TooManyPrimitives(..) => ErrorType::Validation,
+            | Self::TooManyPrimitives(..)
+            | Self::ZeroGeometries => ErrorType::Validation,
         }
     }
 }

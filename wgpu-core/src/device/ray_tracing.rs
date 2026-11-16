@@ -78,6 +78,9 @@ impl Device {
                         descriptors.len() as u32,
                     ));
                 }
+                if descriptors.len() == 0 {
+                    return Err(CreateBlasError::ZeroGeometries);
+                }
 
                 let mut entries =
                     Vec::<hal::AccelerationStructureTriangles<dyn hal::DynBuffer>>::with_capacity(
@@ -153,6 +156,10 @@ impl Device {
                         self.limits.max_blas_geometry_count,
                         descriptors.len() as u32,
                     ));
+                }
+
+                if descriptors.len() == 0 {
+                    return Err(CreateBlasError::ZeroGeometries);
                 }
 
                 let mut entries =
