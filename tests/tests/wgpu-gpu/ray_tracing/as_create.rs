@@ -12,6 +12,7 @@ pub fn all_tests(tests: &mut Vec<wgpu_test::GpuTestInitializer>) {
         BLAS_INVALID_VERTEX_FORMAT,
         BLAS_MISMATCHED_INDEX,
         UNSUPPORTED_ACCELERATION_STRUCTURE_RESOURCES,
+        BLAS_ZERO_GEOMETRY,
     ]);
 }
 
@@ -162,6 +163,60 @@ fn unsupported_acceleration_structure_resources(ctx: TestingContext) {
                         count: None,
                     }],
                 })
+        },
+        None,
+    );
+}
+
+#[apply(gpu_test!)]
+static BLAS_ZERO_GEOMETRY: GpuTestConfiguration = GpuTestConfiguration::new()
+    .parameters(
+        TestParameters::default()
+            .test_features_limits()
+            .limits(acceleration_structure_limits())
+            .features(wgpu::Features::EXPERIMENTAL_RAY_QUERY)
+            .enable_noop(),
+    )
+    .run_sync(zero_geometry_blas_create);
+
+fn zero_geometry_blas_create(ctx: TestingContext) {
+    //
+    // Create a BLAS with a no geometries.
+    //
+
+    // First a triangle BLAS. 
+    fail(
+        &ctx.device,
+        || {
+            let _ = ctx.device.create_blas(
+                &CreateBlasDescriptor {
+                    label: Some("BLAS"),
+                    flags: AccelerationStructureFlags::PREFER_FAST_TRACE,
+                    update_mode: AccelerationStructureUpdateMode::Build,
+                },
+                BlasGeometrySizeDescriptors::Triangles {
+                    descriptors: vec![],
+                },
+            );
+        },
+        None,
+    );
+
+    // Then an AABB BLAS.
+    // These take different code paths, so we check both.
+    fail(
+        &ctx.device,
+        || {
+            let _ = ctx.device.create_blas(
+                &CreateBlasDescriptor {
+                    label: Some("BLAS AABB"),
+                    flags: AccelerationStructureFlags::PREFER_FAST_TRACE,
+                    update_mode: AccelerationStructureUpdateMode::Build,
+                },
+                BlasGeometrySizeDescriptors::AABBs {
+                    descriptors: vec![],
+                },
+            );
         },
         None,
     );
